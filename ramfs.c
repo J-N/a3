@@ -34,6 +34,8 @@
 #define GETSUPERBLOCK(start) ((struct superblock *) start)->freeblocks
 #define GETSUPERINODE(start)  ((struct superblock *) start)->freeinodes
 
+//data block macros
+#define DATABLOCK(start,num) (start + BLOCKSIZE * (1 + INODEBLOCKS + BITMAPBLOCKS)) + num * BLOCKSIZE
 
 
 struct superblock
@@ -49,6 +51,12 @@ struct inode
   void *location[10];
 };
 
+struct direntry
+{
+  char *filename;
+  unsigned short inode;
+};
+
 void *initialize()
 {
   void *filesys = malloc(FSSIZE);
@@ -57,6 +65,13 @@ void *initialize()
   int i;
   for(i=0;i<32*BLOCKSIZE;i++)
     ALLOCZERO(filesys, i);
+  //set up root directory entry
+  SETSUPERBLOCK(filesys,GETSUPERBLOCK(filesys) - 1);
+  SETSUPERINODE(filesys, GETSUPERINODE(filesys) - 1);
+  SETINODETYPE(filesys,0,"dir");
+  SETINODESIZE(filesys,0,0);
+  SETINODELOC(filesys,0,0,DATABLOCK(filesys,0));
+  
   return filesys;
 }
 
@@ -79,4 +94,11 @@ int main(int argc, char** argv)
   SETINODETYPE(test,100,"reg");
   SETINODESIZE(test,100,1337);
   printf("Inode 100 type:\t%s\nInode 100 size:\t%d\n",GETINODETYPE(test,100),GETINODESIZE(test,100));
+
+  printf("Root directory printout:\n");
+  printf("Inode type:\t%s\n",GETINODETYPE(test,0));
+  printf("Inode size:\t%d\n",GETINODESIZE(test,0));
+  printf("Inode location pointer:\t%x\n",(unsigned int)GETINODELOC(test,0,0));
+  printf("First Data Block:\t%x\n",(unsigned int)DATABLOCK(test,0));
+  
 }
