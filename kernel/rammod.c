@@ -324,13 +324,13 @@ int rd_creat(char *pathname)
 			{
 				inode = GETDIRENTINODE(place,i);
 				place = GETINODELOC(test,GETDIRENTINODE(place,i),0);
+				new = place;
 				break;
 			}
 		}
 		result = strsep(&pathname,delim);
 		if(new == NULL && result != NULL)
 		return -1;
-		place = new;
 		new = NULL;
 	}
 	//find a free block for the new file
@@ -425,11 +425,12 @@ int rd_mkdir(char *pathname)
 				place = GETINODELOC(test,inode,j-1);
 				j++;
 			}
-			if(strcmp("hurp",result) == 0)
+			if(strcmp(GETDIRENTNAME(place,i),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i)),"dir") == 0)
 			{
 				printk("<1> debug hurp case\n"); // debug
 				inode = GETDIRENTINODE(place,i);
 				place = GETINODELOC(test,GETDIRENTINODE(place,i),0);
+				new = place;
 				break;
 			}
 		}
@@ -440,7 +441,6 @@ int rd_mkdir(char *pathname)
 			printk("<1> returning -1"); // debug
 			return -1;
 		}
-		place = new;
 		new = NULL;
 	}
 	
