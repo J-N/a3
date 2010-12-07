@@ -232,11 +232,11 @@ unsigned int cmd, unsigned long arg)
 		strcpy(hurp,"/test");
 
 	rd_mkdir(hurp);
-/*	
+
 		strcpy(hurp,"/test/har");
 
 		rd_creat(hurp);
-
+/*	
 		printk("<1> Size of file for inode 1:\t%d\ntype:\t%s\n",GETINODESIZE(test,1),GETINODETYPE(test,1));
 
 		printk("<1> Root direntry for test:\t%s\nInode:\t%hd\n",GETDIRENTNAME(GETINODELOC(test,0,0),0),GETDIRENTINODE(GETINODELOC(test,0,0),0));
@@ -286,11 +286,11 @@ void *initialize()
 
 int rd_creat(char *pathname)
 {
-	/*
+	
 	const char delim[] = "/";
 	char *result = NULL;
 	char *filename = NULL;
-	
+	/*
 	result = strsep(&pathname, delim);
 	
 	while(result != NULL)
@@ -299,6 +299,7 @@ int rd_creat(char *pathname)
 		result = strsep(&pathname,delim);
 	}
 	printk("<1> Filename:\t%s\n",filename); // debug
+	*/
 	result = strsep(&pathname, delim);
 	int inode = 0;
 	void *fblock = NULL;
@@ -382,7 +383,7 @@ int rd_creat(char *pathname)
 	SETDIRENTINODE(GETINODELOC(test,inode,(GETINODESIZE(test,inode) / BLOCKSIZE)),(GETINODESIZE(test,inode)/DIRENTSIZE),newinode);
 	SETDIRENTNAME(GETINODELOC(test,inode,(GETINODESIZE(test,inode) / BLOCKSIZE)),(GETINODESIZE(test,inode)/DIRENTSIZE),filename);
 	SETINODESIZE(test,inode,GETINODESIZE(test,inode)+DIRENTSIZE);
-	*/
+	
 	return 0;
 }
 
@@ -391,7 +392,7 @@ int rd_mkdir(char *pathname)
 	const char delim[] = "/";
 	char *result = NULL;
 	char *filename = NULL;
-	result = strsep(&pathname, delim);
+	/*result = strsep(&pathname, delim);
 	
 	while(result != NULL)
 	{
@@ -400,7 +401,7 @@ int rd_mkdir(char *pathname)
 	}
 	
 	printk("<1> Dirname: %s\n",filename); // debug
-	/*
+	*/
 	result = strsep(&pathname, delim);
 	int inode = 0;
 	void *fblock = NULL;
@@ -412,8 +413,10 @@ int rd_mkdir(char *pathname)
 	int j = 1;
 
 	//check path, store inode # of dir to put file into in inode, and place as its current location.
+	printk("<1> About do checks on path and stuff\n"); // debug
 	while(result != NULL)
 	{
+		filename = result;
 		numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
 		for(i=0;i<numdirent;i++)
 		{
@@ -424,17 +427,23 @@ int rd_mkdir(char *pathname)
 			}
 			if(strcmp("hurp",result) == 0)
 			{
+				printk("<1> debug hurp case\n"); // debug
 				inode = GETDIRENTINODE(place,i);
 				place = GETINODELOC(test,GETDIRENTINODE(place,i),0);
 				break;
 			}
 		}
+		printk("<1> Dirname: %s\n",filename); // debug
 		result = strsep(&pathname,delim);
 		if(new == NULL && result != NULL)
-		return -1;
+		{
+			printk("<1> returning -1"); // debug
+			return -1;
+		}
 		place = new;
 		new = NULL;
 	}
+	
 
 	//find a free block for the new file
 	for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
@@ -488,7 +497,7 @@ int rd_mkdir(char *pathname)
 	SETDIRENTINODE(GETINODELOC(test,inode,(GETINODESIZE(test,inode) / BLOCKSIZE)),(GETINODESIZE(test,inode)/DIRENTSIZE),newinode);
 	SETDIRENTNAME(GETINODELOC(test,inode,(GETINODESIZE(test,inode) / BLOCKSIZE)),(GETINODESIZE(test,inode)/DIRENTSIZE),filename);
 	SETINODESIZE(test,inode,GETINODESIZE(test,inode)+DIRENTSIZE);
-	*/
+	
 	return 0;
 }      
 
