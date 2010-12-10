@@ -162,7 +162,7 @@ int rd_unlink(char *pathname)
   void *removeplace = NULL;
   int numdirent;
   int i;
-  int l=0;
+  int l=0; //John: may have to be set to 1 in kernel
   int j = 1;
   while(result != NULL)
     {
@@ -228,25 +228,26 @@ int rd_unlink(char *pathname)
       if(removeinode == 0)
 	return -1;
       int removeblocks = GETINODESIZE(test,removeinode) / BLOCKSIZE;
+      //remove data blocks
       if(removeblocks == 0)
 	{
 	  ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODELOC(test,removeinode,0)));
 	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
 	  printf("Removing location block\n");
 	}
-
       for(i=0;i<removeblocks;i++)
 	{
 	  ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODELOC(test,removeinode,i)));
 	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
 	  printf("Removing location block\n");
 	}
+      //remove single indirect index blocks
       if(removeblocks > 7)
 	{
 	  ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODEIND(test,removeinode,8)));
 	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
 	}
-  
+      //remove double indirect index blocks
       if(removeblocks > 71)
 	{
 	  void * doubleind = GETINODEIND(test,removeinode,9);
@@ -259,10 +260,12 @@ int rd_unlink(char *pathname)
 	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
   
 	}
+      //remove inode
       SETINODESIZE(test,removeinode,-1337);
       SETSUPERINODE(test,GETSUPERINODE(test) + 1);
       numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
       j=1;
+      //remove directory entry in parent directory
       for(i=0;i<numdirent;i++)
 	{
 	  if(i>= j*(BLOCKSIZE/DIRENTSIZE))
@@ -278,6 +281,7 @@ int rd_unlink(char *pathname)
 	    }
 
 	}
+      //set inode size for parent directory
       	  SETINODESIZE(test,inode,GETINODESIZE(test,inode) - DIRENTSIZE);
 	  printf("Dirent Size: %d\n",GETINODESIZE(test,inode));
 	  
