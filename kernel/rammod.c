@@ -231,12 +231,12 @@ unsigned int cmd, unsigned long arg)
 
 		strcpy(hurp,"/test");
 
-	rd_mkdir(hurp);
-
+		rd_mkdir(hurp);
+/*
 		strcpy(hurp,"/test/har");
 
 		rd_creat(hurp);
-/*	
+	
 		printk("<1> Size of file for inode 1:\t%d\ntype:\t%s\n",GETINODESIZE(test,1),GETINODETYPE(test,1));
 
 		printk("<1> Root direntry for test:\t%s\nInode:\t%hd\n",GETDIRENTNAME(GETINODELOC(test,0,0),0),GETDIRENTINODE(GETINODELOC(test,0,0),0));
@@ -399,10 +399,12 @@ int rd_mkdir(char *pathname)
 		filename = result;
 		result = strsep(&pathname,delim);
 	}
-	
-	printk("<1> Dirname: %s\n",filename); // debug
 	*/
+	printk("<1> pathname: %s\n",pathname); // debug
+	
 	result = strsep(&pathname, delim);
+	result = strsep(&pathname, delim);
+	printk("<1> first result: %s\n",result); // debug
 	int inode = 0;
 	void *fblock = NULL;
 	void *place = GETINODELOC(test,0,0);
@@ -416,26 +418,30 @@ int rd_mkdir(char *pathname)
 	printk("<1> About do checks on path and stuff\n"); // debug
 	while(result != NULL)
 	{
-		filename = result;
 		numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+		//printk("<1> direntsize: %d\n",DIRENTSIZE); // debug
+		printk("<1> numdirent: %d\n",numdirent); // debug
 		for(i=0;i<numdirent;i++)
 		{
+		
 			if(i> j*(BLOCKSIZE/DIRENTSIZE))
 			{
+				printk("<1> debug blocksize case\n"); // debug
 				place = GETINODELOC(test,inode,j-1);
 				j++;
 			}
 			if(strcmp(GETDIRENTNAME(place,i),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i)),"dir") == 0)
 			{
-				printk("<1> debug hurp case\n"); // debug
+				printk("<1> debug strcmp case\n"); // debug
 				inode = GETDIRENTINODE(place,i);
 				place = GETINODELOC(test,GETDIRENTINODE(place,i),0);
 				new = place;
 				break;
 			}
 		}
-		printk("<1> Dirname: %s\n",filename); // debug
+		
 		result = strsep(&pathname,delim);
+		printk("<1> directory: %s\n",result); // debug
 		if(new == NULL && result != NULL)
 		{
 			printk("<1> returning -1"); // debug
