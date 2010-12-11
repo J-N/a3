@@ -69,7 +69,31 @@ struct dirent
 void *GETINODELOC(void *start, int num, int locnum)
 {
   if(locnum < 8)
-    return *((void **)(INODE(start,num) + 8 + locnum*4 ));
+    {
+      /* if(((void **)(INODE(start,num) + 8 + locnum*4 )) == NULL)
+	{
+	  int i;
+	    void *fblock = NULL;
+	    for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
+	      {
+		if(!ISALLOC(test,i))
+		  {
+		    fblock= DATABLOCK(test,i);
+		    ALLOCONE(test,i);
+		    break;
+		  }
+	      }
+	    if(fblock == NULL)
+	      {
+		printf("Can't allocate index block in SETINODELOC.\n");
+		exit(1);
+	      }
+    	    SETINODEIND(test,num,locnum,fblock);
+	    SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
+	}
+      */  
+      return *((void **)(INODE(start,num) + 8 + locnum*4 ));
+    }
   else
     if(locnum < 71)
       {
@@ -377,7 +401,7 @@ int rd_creat(char *pathname)
 	    {
 	      newdirblock= DATABLOCK(test,i);
 	      ALLOCONE(test,i);
-	      SETINODELOC(test,inode,(GETINODESIZE(test,inode) / 256) + 1,newdirblock);
+	      SETINODELOC(test,inode,(GETINODESIZE(test,inode) / 256),newdirblock);
 	      break;
 	    }
 	}
@@ -482,7 +506,7 @@ int rd_mkdir(char *pathname)
 	    {
 	      newdirblock= DATABLOCK(test,i);
 	      ALLOCONE(test,i);
-	      SETINODELOC(test,inode,(GETINODESIZE(test,inode) / 256) + 1,newdirblock);
+	      SETINODELOC(test,inode,(GETINODESIZE(test,inode) / 256),newdirblock);
 	      break;
 	    }
 	}
@@ -520,10 +544,19 @@ int main(int argc, char** argv)
   printf("Inode size:\t%d\n",GETINODESIZE(test,0));
   printf("Inode location pointer:\t%x\n",(unsigned int)GETINODELOC(test,0,0));
   printf("First Data Block:\t%x\n",(unsigned int)DATABLOCK(test,3));
-
+  //void *hee = GETINODELOC(test,0,1);
   printf("Here goes nothing...\n");
   char *hurp = malloc(200);
-  strcpy(hurp,"/test");
+  int i;
+  
+  for(i=0;i<20;i++)
+    {
+      sprintf(hurp,"/file%d",i);
+      if(rd_mkdir(hurp) == -1)
+	printf("error\n");
+    }
+  
+  /*  strcpy(hurp,"/test");
   if(rd_mkdir(hurp) == -1)
     printf("error");
 
@@ -538,7 +571,7 @@ int main(int argc, char** argv)
   strcpy(hurp,"/test/har2");
   if(rd_creat(hurp) == -1)
     printf("error");
-
+  */
   printf("Size of file for inode 0:\t%d\ntype:\t%s\n",GETINODESIZE(test,0),GETINODETYPE(test,0));
   
   printf("Size of file for inode 1:\t%d\ntype:\t%s\n",GETINODESIZE(test,1),GETINODETYPE(test,1));
@@ -548,7 +581,7 @@ int main(int argc, char** argv)
   printf("test Directory Entry for har:\t%s\nInode:\t%hd\n",GETDIRENTNAME(GETINODELOC(test,1,0),0),GETDIRENTINODE(GETINODELOC(test,1,0),0));
   printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
 
-  strcpy(hurp,"/test/test2/har");
+  /* strcpy(hurp,"/test/test2/har");
   if(rd_unlink(hurp) == -1)
     printf("error");
 
@@ -564,7 +597,7 @@ int main(int argc, char** argv)
   if(rd_unlink(hurp) == -1)
     printf("error");
 
-
+  */
   printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
   
   return;
