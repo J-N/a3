@@ -216,11 +216,11 @@ int rd_unlink(char *pathname)
 	return -1;
       new = NULL;
     }
-  printf("have directory inodes\n");
+  //printf("have directory inodes\n");
   //now we have a directory in place and its inode in inode
       numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
-      printf("inode:%d\n",inode);
-      printf("numdirent:%d\n",numdirent);
+      //  printf("inode:%d\n",inode);
+      //printf("numdirent:%d\n",numdirent);
       j=1;
       removeplace = place;
       removeinode = inode;
@@ -246,7 +246,7 @@ int rd_unlink(char *pathname)
 	  printf("it is here\n");
 	  return -1;
 	}
-      printf("have remove and dir inodes\n");
+      // printf("have remove and dir inodes\n");
       //now have remove and dir inodes and first blocks
       if(strcmp(GETINODETYPE(test,removeinode),"dir") == 0)
 	if(GETINODESIZE(test,removeinode) != 0)
@@ -309,13 +309,20 @@ int rd_unlink(char *pathname)
 	}
       //set inode size for parent directory
       	  SETINODESIZE(test,inode,GETINODESIZE(test,inode) - DIRENTSIZE);
-	  printf("Dirent Size: %d\n",GETINODESIZE(test,inode));
-	  if(GETINODESIZE(test,inode) % 256 == 0) //we can free the empty node
+	  //  printf("Dirent Size: %d\n",GETINODESIZE(test,inode));
+	  if(GETINODESIZE(test,inode) % 256 == 0  && GETINODESIZE(test,inode)!=0) //we can free the empty node
 	    {
+	      
 	      void *blk = GETINODELOC(test,inode,GETINODESIZE(test,inode) / 256);
 	      ALLOCZERO(test,GETBLOCKFROMPTR(test,blk));
 	      SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
 	      SETINODELOC(test,inode,GETINODESIZE(test,inode)/256,NULL);
+	      if(GETINODESIZE(test,inode) / 256 == 8)
+		{
+		  ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODEIND(test,inode,8)));
+		  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+		  SETINODEIND(test,inode,8,NULL);
+		}
 	    }
 
 	  
@@ -562,21 +569,27 @@ int main(int argc, char** argv)
   printf("Here goes nothing...\n");
   char *hurp = malloc(200);
   int i;
-  
+  sprintf(hurp,"/test");
+  rd_mkdir(hurp);
   for(i=0;i<200;i++)
     {
-      sprintf(hurp,"/file%d",i);
+      sprintf(hurp,"/test/file%d",i);
       if(rd_mkdir(hurp) == -1)
 	printf("error\n");
     }
 
    for(i=199;i>=0;i--)
     {
-      sprintf(hurp,"/file%d",i);
+      sprintf(hurp,"/test/file%d",i);
       if(rd_unlink(hurp) == -1)
 	printf("error\n");
     }
-  
+   
+  printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
+
+   sprintf(hurp,"/test");
+   if(rd_unlink(hurp) == -1)
+     printf("error\n");
   /*  strcpy(hurp,"/test");
   if(rd_mkdir(hurp) == -1)
     printf("error");
@@ -593,8 +606,6 @@ int main(int argc, char** argv)
   if(rd_creat(hurp) == -1)
     printf("error");
   */
-
-  printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
 
   /* strcpy(hurp,"/test/test2/har");
   if(rd_unlink(hurp) == -1)
