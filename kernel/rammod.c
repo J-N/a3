@@ -54,6 +54,7 @@
 #define GETDIRENTINODE(block,num) *((unsigned short *)(block + num * DIRENTSIZE))
 #define SETDIRENTNAME(block,num,val) *((char **)(block + num * DIRENTSIZE + 2)) = val
 #define SETDIRENTINODE(block,num,val) *((unsigned short *)(block + num * DIRENTSIZE)) = val
+#define GETBLOCKFROMPTR(start,ptr) ((ptr - DATABLOCK(start,0)) / BLOCKSIZE) 
 
 /* attribute structures */
 struct ioctl_test_t {
@@ -71,6 +72,7 @@ static struct proc_dir_entry *proc_entry;
 void *initialize();
 int rd_mkdir(char *pathname);
 int rd_creat(char *pathname);
+int rd_unlink(char *pathname);
 
 void *test; //our filesystem in main
 
@@ -262,6 +264,13 @@ unsigned int cmd, unsigned long arg)
 			if(rd_mkdir(hurp) == -1)
 			printk("<1> error\n");
 		}
+		
+		for(i=199;i>=0;i--)
+		{
+			sprintf(hurp,"/test/file%d",i);
+			if(rd_unlink(hurp) == -1)
+			printk("<1> error\n");
+		}
 /*
 		strcpy(hurp,"/test/har");
 
@@ -437,6 +446,7 @@ int rd_mkdir(char *pathname)
     }
   printk("<1> Dirname:\t%s\n",filename); // debug
   result = strsep(&pathname, delim);
+  result = strsep(&pathname, delim);
   int inode = 0;
   void *fblock = NULL;
   void *place = GETINODELOC(test,0,0);
@@ -459,62 +469,78 @@ int rd_mkdir(char *pathname)
 	    }
 	  if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"dir") == 0)
 	    {
-	      inode = GETDIRENTINODE(place,i%16);
-	      place = GETINODELOC(test,GETDIRENTINODE(place,i%16),0);
-	      new = place;
-	      break;
+			//printk("<1> Dir type correct \n");
+			inode = GETDIRENTINODE(place,i%16);
+			place = GETINODELOC(test,GETDIRENTINODE(place,i%16),0);
+			new = place;
+			break;
 	    }
 	  //New code for John
-	  if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"reg") == 0)
-	    return -1;
+		if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"reg") == 0)
+		{
+				printk("<1> Not dir type. \n");
+			return -1;
+		}
 	}
       result = strsep(&pathname,delim);
-      if(new == NULL && result != NULL)
-	return -1;
+		if(new == NULL && result != NULL)
+		{
+				printk("<1> no new and reached the end \n");
+				return -1;
+		}
       new = NULL;
     }
   //find a free block for the new file
   for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
     {
-      if(!ISALLOC(test,i))
-	{
-	  fblock= DATABLOCK(test,i);
-	  ALLOCONE(test,i);
-	  break;
-	}
+		if(!ISALLOC(test,i))
+		{
+			fblock= DATABLOCK(test,i);
+			ALLOCONE(test,i);
+			break;
+		}
     }
-  if(fblock == NULL)
-    return -1;
+	if(fblock == NULL)
+    {
+		printk("<1> fblock is null");
+		return -1;
+	}
   //find a free inode for the child
   for(i=0;i<INODEBLOCKS * 4;i++)
     {
-      if(GETINODESIZE(test,i) == -1337)
-	{
-	  newinode = i;
-	  SETINODESIZE(test,i,0);
-	  SETINODETYPE(test,i,"dir");
-	  SETINODELOC(test,i,0,fblock);
-	  break;
-	}
+		if(GETINODESIZE(test,i) == -1337)
+		{
+			newinode = i;
+			SETINODESIZE(test,i,0);
+			SETINODETYPE(test,i,"dir");
+			SETINODELOC(test,i,0,fblock);
+			break;
+		}
     }
-  if(newinode==-1)
-    return -1;
+	if(newinode==-1)
+    {
+		printk("<1> New Inode is -1");
+		return -1;
+	}
   //allocate a new block for the directory if we will grow past its limit
   if((GETINODESIZE(test,inode) / DIRENTSIZE) % 16 == 0  && GETINODESIZE(test,inode) != 0)
     {
-      void *newdirblock = NULL;
-      for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
-	{
-	  if(!ISALLOC(test,i))
-	    {
-	      newdirblock= DATABLOCK(test,i);
-	      ALLOCONE(test,i);
-	      SETINODELOC(test,inode,(GETINODESIZE(test,inode) / 256),newdirblock);
-	      break;
-	    }
-	}
-      if(newdirblock == NULL)
-	return -1;
+		void *newdirblock = NULL;
+		for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
+		{
+			if(!ISALLOC(test,i))
+			{
+				newdirblock= DATABLOCK(test,i);
+				ALLOCONE(test,i);
+				SETINODELOC(test,inode,(GETINODESIZE(test,inode) / 256),newdirblock);
+				break;
+			}
+		}
+		if(newdirblock == NULL)
+		{
+			printk("<1> Newdirblock is null");
+			return -1;
+		}
       SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
     }
   SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
@@ -524,9 +550,170 @@ int rd_mkdir(char *pathname)
   SETINODESIZE(test,inode,GETINODESIZE(test,inode)+DIRENTSIZE);
   
   return 0;
-  
-      
 }    
+
+int rd_unlink(char *pathname)
+{
+	const char *delim = "/";
+	char *result = NULL;
+	char *filename = NULL;
+	char *path2 = vmalloc(400);
+	int k =0;
+	strcpy(path2,pathname);
+	result = strsep(&path2, delim);
+	while(result != NULL)
+    {
+		k++;
+		filename = result;
+		result = strsep(&path2,delim);
+    }
+	printk("<1> Filename:\t%s\n",filename); // debug
+	result = strsep(&pathname, delim);
+	result = strsep(&pathname, delim);
+	int inode = 0;
+	void *place = GETINODELOC(test,0,0);
+	void *new = NULL;
+	int removeinode = 0;
+	void *removeplace = NULL;
+	int numdirent;
+	int i;
+	int l=0; //John: may have to be set to 1 in kernel
+	int j = 1;
+	while(result != NULL)
+    {
+		l++;
+		j=1;
+		numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+		for(i=0;i<numdirent && l!=k;i++)
+		{
+			if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+			{
+			place = GETINODELOC(test,inode,j);
+			j++;
+			}
+			if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"dir") == 0  && l!=k)
+			{
+				inode = GETDIRENTINODE(place,i%16);
+				place = GETINODELOC(test,GETDIRENTINODE(place,i%16),0);
+				new = place;
+				break;
+			}
+		}
+		result = strsep(&pathname, delim);
+		if(new == NULL && result != NULL) //Then we have no directory match
+		return -1;
+		new = NULL;
+    }
+  //printf("have directory inodes\n");
+  //now we have a directory in place and its inode in inode
+    numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+      //  printf("inode:%d\n",inode);
+      //printf("numdirent:%d\n",numdirent);
+    j=1;
+    removeplace = place;
+    removeinode = inode;
+    new = NULL;
+    for(i=0;i<numdirent;i++)
+	{
+	   if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+	    {
+	      removeplace = GETINODELOC(test,removeinode,j);
+	      j++;
+	    }
+	   //printf("filename again:%s\n",GETDIRENTNAME(removeplace,i+2));
+	    if(strcmp(GETDIRENTNAME(removeplace,i%16),filename) == 0)
+	    {
+	      removeinode = GETDIRENTINODE(removeplace,i%16);
+	      removeplace = GETINODELOC(test,GETDIRENTINODE(removeplace,i%16),0);
+	      new = removeplace;
+	      break;
+	    }
+	}
+    if(new == NULL)
+	{
+		printk("<1> it is here\n");
+		return -1;
+	}
+      // printf("have remove and dir inodes\n");
+      //now have remove and dir inodes and first blocks
+      if(strcmp(GETINODETYPE(test,removeinode),"dir") == 0)
+	if(GETINODESIZE(test,removeinode) != 0)
+	  return -1;
+      if(removeinode == 0)
+	return -1;
+      int removeblocks = GETINODESIZE(test,removeinode) / BLOCKSIZE;
+      //remove data blocks
+      if(removeblocks == 0)
+	{
+	  ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODELOC(test,removeinode,0)));
+	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+	  printk("<1> Removing location block\n");
+	}
+      for(i=0;i<removeblocks;i++)
+	{
+	  ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODELOC(test,removeinode,i)));
+	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+	  printk("<1> Removing location block\n");
+	}
+    //remove single indirect index blocks
+    if(removeblocks > 7)
+	{
+		ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODEIND(test,removeinode,8)));
+		SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+	}
+    //remove double indirect index blocks
+    if(removeblocks > 71)
+	{
+		void * doubleind = GETINODEIND(test,removeinode,9);
+		for(i=0;i<64;i++)
+		{
+			ALLOCZERO(test,GETBLOCKFROMPTR(test,(void *)(*((unsigned int *) doubleind + i))));
+			SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+		}
+		ALLOCZERO(test,GETBLOCKFROMPTR(test,doubleind));
+		SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+  
+	}
+	//remove inode
+	SETINODESIZE(test,removeinode,-1337);
+	SETSUPERINODE(test,GETSUPERINODE(test) + 1);
+	numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+	j=1;
+	//remove directory entry in parent directory
+    for(i=0;i<numdirent;i++)
+	{
+		if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+	    {
+			place = GETINODELOC(test,inode,j);
+			j++;
+	    }
+		if(GETDIRENTINODE(place,i%16) == removeinode )
+	    {
+			SETDIRENTNAME(place,i%16,GETDIRENTNAME(GETINODELOC(test,inode,(numdirent -1)/16),(numdirent -1)%16));
+			SETDIRENTINODE(place,i%16,GETDIRENTINODE(GETINODELOC(test,inode,(numdirent -1)/16),(numdirent -1)%16));
+			break;
+	    }
+	}
+	//set inode size for parent directory
+	SETINODESIZE(test,inode,GETINODESIZE(test,inode) - DIRENTSIZE);
+	//printf("Dirent Size: %d\n",GETINODESIZE(test,inode));
+	if(GETINODESIZE(test,inode) % 256 == 0  && GETINODESIZE(test,inode)!=0) //we can free the empty node
+	{
+	  
+		void *blk = GETINODELOC(test,inode,GETINODESIZE(test,inode) / 256);
+		ALLOCZERO(test,GETBLOCKFROMPTR(test,blk));
+		SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+		SETINODELOC(test,inode,GETINODESIZE(test,inode)/256,NULL);
+		if(GETINODESIZE(test,inode) / 256 == 8)
+		{
+			ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODEIND(test,inode,8)));
+			SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+			SETINODEIND(test,inode,8,NULL);
+		}
+	}
+
+    return 0;
+}
 
 module_init(initialization_routine);
 module_exit(cleanup_routine);
