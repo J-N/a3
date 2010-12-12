@@ -76,6 +76,18 @@ int rd_unlink(char *pathname);
 
 void *test; //our filesystem in main
 
+void my_printk(char *string) 
+{ 
+  struct tty_struct *my_tty;
+
+  my_tty = current->signal->tty;
+
+  if (my_tty != NULL) { 
+    (*my_tty->driver->write)(my_tty, string, strlen(string)); 
+    (*my_tty->driver->write)(my_tty, "\015\012", 2); 
+  } 
+} 
+
 void *GETINODELOC(void *start, int num, int locnum)
 {
   if(locnum < 8)
@@ -206,8 +218,15 @@ static int __init initialization_routine(void)
 	proc_entry->owner = THIS_MODULE;
 	proc_entry->proc_fops = &pseudo_dev_proc_operations;
 
-	//printk("<1> Setting up Filesystem\n");
 
+	printk("<1> Initializing filesystem\n");
+	test = initialize();
+	if(test == NULL)
+	{
+		printk("<1> Error Initializing Filesystem\n");
+	}
+	printk("<1> Superblock:\t%x\nFirst Inode:\t%x\nBitmap Start:\t%x\n",(unsigned int)test,(unsigned int)INODE(test,0),(unsigned int)BITMAP(test));
+	printk("<1> Second Inode:\t%x\n",(unsigned int)INODE(test,1));
 	return 0;
 }
 
@@ -225,92 +244,40 @@ unsigned int cmd, unsigned long arg)
 		copy_from_user(&ioc, (struct ioctl_test_t *)arg, 
 		sizeof(struct ioctl_test_t));
 		int f1 = ioc.field1;
-		int f2 = ioc.field2;
+		char *f2 = (char *)ioc.field2;
 		
 		printk("<1> Recieved Ioctol call\n");
 
-		printk("<1> Initializing filesystem\n");
-
-		test = initialize();
-		if(test == NULL)
-		{
-			printk("<1> Error Initializing Filesystem\n");
-			//exit(1);
-		}
-		printk("<1> Superblock:\t%x\nFirst Inode:\t%x\nBitmap Start:\t%x\n",(unsigned int)test,(unsigned int)INODE(test,0),(unsigned int)BITMAP(test));
-
-		printk("<1> Second Inode:\t%x\n",(unsigned int)INODE(test,1));
-
-		printk("<1> Here goes nothing...\n");
-
 		char *hurp = vmalloc(200);
-		int i;
 		
-		//sprintf(hurp,"/test");
-	 // rd_mkdir(hurp);
-	  
-	  for(i=0;i<5001;i++)
+		if(f1==1)
 		{
-		  sprintf(hurp,"/dir%d",i);
-		  if(rd_mkdir(hurp) == -1)
-		printk("<1> error\n");
+			sprintf(hurp,"/%s",f2);
+			printk("<1> Creating dir %s\n",hurp);
+			if(rd_mkdir(hurp) == -1)
+			{
+				printk("<1> error\n");
+			}
 		}
-
-		
-	   for(i=5000;i>=0;i--)
+		if(f1==2)
 		{
-		  sprintf(hurp,"/dir%d",i);
-		  if(rd_unlink(hurp) == -1)
-		printk("<1> error\n");
+			sprintf(hurp,"/%s",f2);
+			printk("<1> Removing %s\n",hurp);
+			if(rd_unlink(hurp) == -1)
+			{
+				printk("<1> error\n");
+			}
 		}
-		
-		//sprintf(hurp,"/test");
-  // if(rd_unlink(hurp) == -1)
-    // printk("<1> error\n");
-	   /*
-
-	sprintf(hurp,"/test/test2");
-	  rd_mkdir(hurp);
-	  for(i=0;i<2010;i++)
+		if(f1==3)
 		{
-		  sprintf(hurp,"/test/test2/file%d",i);
-		  if(rd_mkdir(hurp) == -1)
-		printk("<1> error\n");
+			sprintf(hurp,"/%s",f2);
+			printk("<1> Creating file %s\n",hurp);
+			if(rd_creat(hurp) == -1)
+			{
+				printk("<1> error\n");
+			}
 		}
-
-	   for(i=2010;i>=0;i--)
-		{
-		  sprintf(hurp,"/test/test2/file%d",i);
-		  if(rd_unlink(hurp) == -1)
-		printk("<1> error\n");
-		}
-	   */
-	  printk("<1> Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
-/*
-	     sprintf(hurp,"/test/test2");
-   if(rd_unlink(hurp) == -1)
-    printk("<1> error\n");
-
-   sprintf(hurp,"/test");
-   if(rd_unlink(hurp) == -1)
-     printk("<1> error\n");
-	  printk("<1> Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
-	 
-	  
-		strcpy(hurp,"/test/har");
-
-		rd_creat(hurp);
-	
-		printk("<1> Size of file for inode 1:\t%d\ntype:\t%s\n",GETINODESIZE(test,1),GETINODETYPE(test,1));
-
-		printk("<1> Root direntry for test:\t%s\nInode:\t%hd\n",GETDIRENTNAME(GETINODELOC(test,0,0),0),GETDIRENTINODE(GETINODELOC(test,0,0),0));
-
-		printk("<1> Size of file for inode 2:\t%d\ntype:\t%s\n",GETINODESIZE(test,2),GETINODETYPE(test,2));
-
-		printk("<1> test Directory Entry for har:\t%s\nInode:\t%hd\n",GETDIRENTNAME(GETINODELOC(test,1,0),0),GETDIRENTINODE(GETINODELOC(test,1,0),0));
-
 		printk("<1> Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
-		*/
 		break;
 
 	default:
@@ -364,6 +331,7 @@ int rd_creat(char *pathname)
       result = strsep(&path2,delim);
     }
   printk("<1> Filename:\t%s\n",filename); // debug
+  result = strsep(&pathname, delim);
   result = strsep(&pathname, delim);
   int inode = 0;
   void *fblock = NULL;
@@ -455,6 +423,7 @@ int rd_creat(char *pathname)
   printk("<1> %d %d %s\n",GETINODESIZE(test,inode)/256,((GETINODESIZE(test,inode)/16)% 16),GETDIRENTNAME(GETINODELOC(test,inode,(GETINODESIZE(test,inode)/256)),(GETINODESIZE(test,inode)/16) % 16));
 
   SETINODESIZE(test,inode,GETINODESIZE(test,inode)+DIRENTSIZE);
+  vfree(path2);
   return 0;
 }      
 
@@ -649,28 +618,19 @@ int rd_unlink(char *pathname)
 	
     for(i=0;i<numdirent;i++)
 	{
-		//printk("<1> i=%d nc=%d, j=%d \n",i,nc,j);
-	
 		if(i >= j*nc)
 	    {
-			//printk("<1>  j=%d \n",j);
 			removeplace = GETINODELOC(test,removeinode,j);
 			j++;
 	    }
-		//i+2
-		char* dname = GETDIRENTNAME(removeplace,i%16);
 		
-		//printk("<1> filename again:%c\n",dname);
-	    
 		if(strcmp(GETDIRENTNAME(removeplace,i%16),filename) == 0)
 	    {
-			printk("<1> i=%d nc=%d, j=%d \n",i,nc,j);
 			removeinode = GETDIRENTINODE(removeplace,i%16);
 			removeplace = GETINODELOC(test,GETDIRENTINODE(removeplace,i%16),0);
 			new = removeplace;
 			break;
-	    }
-		
+	    }	
 	}
     if(new == NULL)
 	{
