@@ -224,8 +224,8 @@ unsigned int cmd, unsigned long arg)
 	case IOCTL_TEST:
 		copy_from_user(&ioc, (struct ioctl_test_t *)arg, 
 		sizeof(struct ioctl_test_t));
-		//int f1 = ioc.field1;
-		//int f2 = ioc.field2;
+		int f1 = ioc.field1;
+		int f2 = ioc.field2;
 		
 		printk("<1> Recieved Ioctol call\n");
 
@@ -276,29 +276,26 @@ unsigned int cmd, unsigned long arg)
 		char *hurp = vmalloc(200);
 		int i;
 		
-		//sprintf(hurp,"/test");
-	//  rd_mkdir(hurp);
+		sprintf(hurp,"/test");
+	  rd_mkdir(hurp);
 	  
-	  for(i=0;i<20;i++)
+	  for(i=0;i<2010;i++)
 		{
-		  sprintf(hurp,"/dir%d",i);
+		  sprintf(hurp,"/test/file%d",i);
 		  if(rd_mkdir(hurp) == -1)
 		printk("<1> error\n");
 		}
- /*
+
 	   for(i=2010;i>=0;i--)
 		{
-		  sprintf(hurp,"/file%d",i);
+		  sprintf(hurp,"/test/file%d",i);
 		  if(rd_unlink(hurp) == -1)
 		printk("<1> error\n");
 		}
-		
-		
-		 
-		 sprintf(hurp,"/test");
+		sprintf(hurp,"/test");
    if(rd_unlink(hurp) == -1)
      printk("<1> error\n");
-	  
+	   /*
 
 	sprintf(hurp,"/test/test2");
 	  rd_mkdir(hurp);
@@ -561,7 +558,7 @@ int rd_mkdir(char *pathname)
     }
 	if(fblock == NULL)
     {
-		printk("<1> fblock is null\n");
+		printk("<1> fblock is null");
 		return -1;
 	}
   //find a free inode for the child
@@ -578,7 +575,7 @@ int rd_mkdir(char *pathname)
     }
 	if(newinode==-1)
     {
-		printk("<1> New Inode is -1\n");
+		printk("<1> New Inode is -1");
 		return -1;
 	}
   //allocate a new block for the directory if we will grow past its limit
@@ -597,7 +594,7 @@ int rd_mkdir(char *pathname)
 		}
 		if(newdirblock == NULL)
 		{
-			printk("<1> Newdirblock is null\n");
+			printk("<1> Newdirblock is null");
 			return -1;
 		}
       SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
