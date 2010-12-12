@@ -276,25 +276,25 @@ unsigned int cmd, unsigned long arg)
 		char *hurp = vmalloc(200);
 		int i;
 		
-		sprintf(hurp,"/test");
-	  rd_mkdir(hurp);
+		//sprintf(hurp,"/test");
+	 // rd_mkdir(hurp);
 	  
-	  for(i=0;i<2010;i++)
+	  for(i=0;i<20;i++)
 		{
-		  sprintf(hurp,"/test/file%d",i);
+		  sprintf(hurp,"/dir%d",i);
 		  if(rd_mkdir(hurp) == -1)
 		printk("<1> error\n");
 		}
 
-	   for(i=2010;i>=0;i--)
+	   for(i=19;i>=0;i--)
 		{
-		  sprintf(hurp,"/test/file%d",i);
+		  sprintf(hurp,"/dir%d",i);
 		  if(rd_unlink(hurp) == -1)
 		printk("<1> error\n");
 		}
-		sprintf(hurp,"/test");
-   if(rd_unlink(hurp) == -1)
-     printk("<1> error\n");
+		//sprintf(hurp,"/test");
+  // if(rd_unlink(hurp) == -1)
+    // printk("<1> error\n");
 	   /*
 
 	sprintf(hurp,"/test/test2");
@@ -618,6 +618,7 @@ int rd_unlink(char *pathname)
 	int k =0;
 	strcpy(path2,pathname);
 	result = strsep(&path2, delim);
+	result = strsep(&path2, delim);
 	while(result != NULL)
     {
 		k++;
@@ -634,7 +635,7 @@ int rd_unlink(char *pathname)
 	void *removeplace = NULL;
 	int numdirent;
 	int i;
-	int l=1; //John: may have to be set to 1 in kernel
+	int l=0; //John: may have to be set to 1 in kernel
 	int j = 1;
 	while(result != NULL)
     {
@@ -690,7 +691,7 @@ int rd_unlink(char *pathname)
 	    
 		if(strcmp(GETDIRENTNAME(removeplace,i%16),filename) == 0)
 	    {
-	
+			printk("<1> i=%d nc=%d, j=%d \n",i,nc,j);
 			removeinode = GETDIRENTINODE(removeplace,i%16);
 			removeplace = GETINODELOC(test,GETDIRENTINODE(removeplace,i%16),0);
 			new = removeplace;
