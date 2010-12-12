@@ -44,8 +44,23 @@
 #define SETDIRENTINODE(block,num,val) *((unsigned short *)(block + num * DIRENTSIZE)) = val
 #define GETBLOCKFROMPTR(start,ptr) ((ptr - DATABLOCK(start,0)) / BLOCKSIZE) 
 
-void *test; //our filesystem in main
+struct fileobj
+{
+  int offset;
+  void *inode;
+  int inodenum;
+  
+};
 
+struct fdt
+{
+  int pid;
+  struct fileobj table[20];
+};
+
+
+void *test; //our filesystem in main
+struct fdt tablearray[20];
 
 void *GETINODELOC(void *start, int num, int locnum)
 {
@@ -177,17 +192,21 @@ void *initialize()
   SETINODELOC(filesys,0,0,DATABLOCK(filesys,0));
   ALLOCONE(filesys,0);
   //SETINODEIND(filesys,0,8,DATABLOCK(filesys,3));  //test indirect ref
-  
+  for(i=0;i<20;i++)
+    tablearray[i].pid = -31337;
   return filesys;
 }
 
-int rd_unlink(char *pathname)
+int rd_open(char * pathname)
 {
   
   const char *delim = "/";
   char *result = NULL;
   char *filename = NULL;
   char *path2 = malloc(400);
+  int root = 0;
+  if(strcmp(pathname, "/") == 0)
+    root = 1;
   int k =0;
   strcpy(path2,pathname);
   result = strtok(path2, delim);
@@ -198,6 +217,7 @@ int rd_unlink(char *pathname)
       result = strtok(NULL,delim);
     }
   printf("Filename:\t%s\n",filename); // debug
+  
   result = strtok(pathname, delim);
   int inode = 0;
   void *place = GETINODELOC(test,0,0);
@@ -239,7 +259,214 @@ int rd_unlink(char *pathname)
   //printf("have directory inodes\n");
   //now we have a directory in place and its inode in inode
       numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
-      //  printf("inode:%d\n",inode);
+      //printf("inode:%d\n",inode);
+      //printf("numdirent:%d\n",numdirent);
+      j=1;
+      removeplace = place;
+      removeinode = inode;
+      new = NULL;
+      for(i=0;i<numdirent;i++)
+	{
+	   if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+	    {
+	      removeplace = GETINODELOC(test,removeinode,j);
+	      j++;
+	    }
+	   if(root)
+	     break;
+	   //printf("filename again:%s\n",GETDIRENTNAME(removeplace,i+2));
+	    if(strcmp(GETDIRENTNAME(removeplace,i%16),filename) == 0)
+	    {
+	      removeinode = GETDIRENTINODE(removeplace,i%16);
+	      removeplace = GETINODELOC(test,GETDIRENTINODE(removeplace,i%16),0);
+	      new = removeplace;
+	      break;
+	    }
+	}
+      if(new == NULL && !root)
+	{
+	  printf("it is here\n");
+	  return -1;
+	}
+      struct fdt *freeptr = NULL;
+      struct fdt *ourptr = NULL;
+      for(i=0;i<20;i++)
+	{
+	  if(tablearray[i].pid == 1337)
+	    {  
+	      ourptr = &tablearray[i];
+	      break;
+	    }
+	  if(tablearray[i].pid == -31337)
+	    {
+	      freeptr = &tablearray[i];
+	      //printf("table entry:\t%i\n",i);
+	    }
+	}
+      if(freeptr == NULL && ourptr == NULL)
+	return -1;
+      if(ourptr != NULL)
+	{
+	  for(i=0;i<20;i++)
+	    {
+	      if(ourptr->table[i].inode == NULL)
+		{
+		  ourptr->table[i].offset = 0;
+		  ourptr->table[i].inode = INODE(test,removeinode);
+		  ourptr->table[i].inodenum = removeinode;
+		  return i;
+		}
+	    }
+	  return -1;
+	}
+      else
+	{
+	  freeptr->pid = 1337;
+	  freeptr->table[0].offset = 0;
+	  freeptr->table[0].inode = INODE(test,removeinode);
+	  freeptr->table[0].inodenum = removeinode;
+	  return 0;
+	}
+		  
+
+}
+int rd_close(int fd)
+{
+  int i;
+  struct fdt *ourptr = NULL;
+  for(i=0;i<20;i++)
+	{
+	  if(tablearray[i].pid == 1337)
+	    {  
+	      ourptr = &tablearray[i];
+	      break;
+	    }	  
+	}
+  if(ourptr == NULL)
+    return -1;
+  if(ourptr->table[fd].inode == NULL)
+    return -1;
+  else
+    {
+      ourptr->table[fd].inode = NULL;
+      return 0;
+    }
+}
+
+int rd_lseek(int fd, int offset)
+{
+  int i;
+  struct fdt *ourptr = NULL;
+  for(i=0;i<20;i++)
+	{
+	  if(tablearray[i].pid == 1337)
+	    {  
+	      ourptr = &tablearray[i];
+	      break;
+	    }	  
+	}
+  if(ourptr == NULL)
+   return -1;
+  if(offset > *((int *) (ourptr->table[fd].inode)))
+    {
+      ourptr->table[fd].offset = *((int *) (ourptr->table[fd].inode));
+      return ourptr->table[fd].offset;
+    }
+  else
+    {
+      ourptr->table[fd].offset = offset;
+      return ourptr->table[fd].offset;
+    }
+}
+
+int rd_readdir(int fd, char *address)
+{
+  int i;
+  void *blk;
+  struct fdt *ourptr = NULL;
+  for(i=0;i<20;i++)
+	{
+	  if(tablearray[i].pid == 1337)
+	    {  
+	      ourptr = &tablearray[i];
+	      break;
+	    }	  
+	}
+  if(ourptr == NULL)
+   return -1;
+  if(strcmp(GETINODETYPE(test,ourptr->table[fd].inodenum),"dir") != 0)
+    return -1;
+  blk = GETINODELOC(test,ourptr->table[fd].inodenum,ourptr->table[fd].offset / 256);
+  int blockpos = ourptr->table[fd].offset % 256;
+  int dirpos = blockpos / 16;
+  *((unsigned short *)address) = GETDIRENTINODE(blk,dirpos);
+  *((char **)(address + 2)) = GETDIRENTNAME(blk,dirpos);
+  ourptr->table[fd].offset += 16;
+  return 0;
+}
+  
+  
+  
+int rd_unlink(char *pathname)
+{
+  
+  const char *delim = "/";
+  char *result = NULL;
+  char *filename = NULL;
+  char *path2 = malloc(400);
+  int k =0;
+  strcpy(path2,pathname);
+  result = strtok(path2, delim);
+  while(result != NULL)
+    {
+      k++;
+      filename = result;
+      result = strtok(NULL,delim);
+    }
+  printf("Filename:\t%s\n",filename); // debug
+  
+  result = strtok(pathname, delim);
+  int inode = 0;
+  void *place = GETINODELOC(test,0,0);
+  void *new = NULL;
+  int removeinode = 0;
+  void *removeplace = NULL;
+  int numdirent;
+  int i;
+  int l=0; //John: may have to be set to 1 in kernel
+  int j = 1;
+  while(result != NULL)
+    {
+      l++;
+      j=1;
+      numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+      for(i=0;i<numdirent && l!=k;i++)
+	{
+	  if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+	    {
+	      place = GETINODELOC(test,inode,j);
+	      j++;
+	    }
+	  if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"dir") == 0  && l!=k)
+	    {
+	      inode = GETDIRENTINODE(place,i%16);
+	      place = GETINODELOC(test,GETDIRENTINODE(place,i%16),0);
+	      new = place;
+	      break;
+	    }
+	}
+
+  
+      result = strtok(NULL,delim);
+      
+      if(new == NULL && result != NULL) //Then we have no directory match
+	return -1;
+      new = NULL;
+    }
+  //printf("have directory inodes\n");
+  //now we have a directory in place and its inode in inode
+      numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+      //printf("inode:%d\n",inode);
       //printf("numdirent:%d\n",numdirent);
       j=1;
       removeplace = place;
@@ -509,13 +736,14 @@ int rd_mkdir(char *pathname)
 	}
       result = strtok(NULL,delim);
       if(new == NULL && result != NULL)
-	return -1;
+	{
+	  return -1;
+	}
       new = NULL;
     }
   //find a free block for the new file
   for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
     {
-      //printf("Isalloc:\t%d %d\n",i,~ISALLOC(test,i));
       if(~ISALLOC(test,i))
 	{
 	  printf("in data block %d %x\n",i,(unsigned int) DATABLOCK(test,i));
@@ -525,7 +753,9 @@ int rd_mkdir(char *pathname)
 	}
     }
   if(fblock == NULL)
-    return -1;
+    {
+      return -1;
+    }
   //find a free inode for the child
   for(i=0;i<INODEBLOCKS * 4;i++)
     {
@@ -607,50 +837,48 @@ int main(int argc, char** argv)
   sprintf(hurp,"/test/he");
   rd_mkdir(hurp);
   printf("loc of he:\t%x\n",(unsigned int)GETINODEIND(test,3,0));
-  */  
+  */
+  /*  
 sprintf(hurp,"/test");
-  rd_mkdir(hurp);
-  for(i=0;i<2010;i++)
+rd_mkdir(hurp);*/
+  for(i=0;i<1023;i++)
     {
-      sprintf(hurp,"/test/file%d",i);
+      sprintf(hurp,"/file%d",i);
       if(rd_mkdir(hurp) == -1)
 	printf("error\n");
     }
-
-   for(i=2010;i>=0;i--)
+  /*
+   for(i=0;i<1023;i++)
     {
-      sprintf(hurp,"/test/file%d",i);
+      sprintf(hurp,"/file%d",i);
       if(rd_unlink(hurp) == -1)
 	printf("error\n");
     }
+  */
+  sprintf(hurp,"/file2");
+  int test1 = rd_open(hurp);
+  //rd_close(test1);
+
+  sprintf(hurp,"/");
+  int test2 = rd_open(hurp);
+  
+  //printf("lseek first fd:\t%d\nroot:\t%d\n",rd_lseek(test1,200),rd_lseek(test2,200));
+  //printf("should be file2 inode:\t%x\n",(unsigned int)tablearray[19].table[0].inode);
+  //printf("is actually file2 inode:\t%x\n",(unsigned int)INODE(test,3));
    
-
-sprintf(hurp,"/test/test2");
-  rd_mkdir(hurp);
-  for(i=0;i<2010;i++)
+  //printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
+  char *testspace = malloc(20);
+  for(i=0;i<1000;i++)
     {
-      sprintf(hurp,"/test/test2/file%d",i);
-      if(rd_mkdir(hurp) == -1)
+      if(rd_readdir(test2,testspace) == -1)
 	printf("error\n");
+      printf("inode:\t%hu\nname:\t%s\n",*((unsigned short *) testspace), *((char **)(testspace + 2)));
     }
-
-   for(i=2010;i>=0;i--)
-    {
-      sprintf(hurp,"/test/test2/file%d",i);
-      if(rd_unlink(hurp) == -1)
-	printf("error\n");
-    }
-   
-  printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
-
-   sprintf(hurp,"/test/test2");
-   if(rd_unlink(hurp) == -1)
-     printf("error\n");
-
+  /*
    sprintf(hurp,"/test");
    if(rd_unlink(hurp) == -1)
      printf("error\n");
-
+  */
   /*  strcpy(hurp,"/test");
   if(rd_mkdir(hurp) == -1)
     printf("error");
@@ -686,6 +914,7 @@ sprintf(hurp,"/test/test2");
 
   */
   printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
-  
+  tablearray[2].table[1].offset = 20;
+  printf("This offset should be 20: %d\n",tablearray[2].table[1].offset);
   return;
 }
