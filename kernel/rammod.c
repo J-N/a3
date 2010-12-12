@@ -577,7 +577,7 @@ int rd_unlink(char *pathname)
 	void *removeplace = NULL;
 	int numdirent;
 	int i;
-	int l=0; //John: may have to be set to 1 in kernel
+	int l=1; //John: may have to be set to 1 in kernel
 	int j = 1;
 	while(result != NULL)
     {
@@ -604,36 +604,48 @@ int rd_unlink(char *pathname)
 		return -1;
 		new = NULL;
     }
-  //printf("have directory inodes\n");
-  //now we have a directory in place and its inode in inode
+	//printf("have directory inodes\n");
+	//now we have a directory in place and its inode in inode
     numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
-      //  printf("inode:%d\n",inode);
-      //printf("numdirent:%d\n",numdirent);
+    printk("<1> inode:%d\n",inode);
+    printk("<1> numdirent:%d\n",numdirent);
     j=1;
     removeplace = place;
     removeinode = inode;
     new = NULL;
+	
+	int nc = BLOCKSIZE/DIRENTSIZE;
+	
     for(i=0;i<numdirent;i++)
 	{
-	   if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+		printk("<1> i=%d nc=%d, j=%d \n",i,nc,j);
+	
+		if(i >= j*nc)
 	    {
-	      removeplace = GETINODELOC(test,removeinode,j);
-	      j++;
+			printk("<1>  j=%d \n",j);
+			removeplace = GETINODELOC(test,removeinode,j);
+			j++;
 	    }
-	   //printf("filename again:%s\n",GETDIRENTNAME(removeplace,i+2));
-	    if(strcmp(GETDIRENTNAME(removeplace,i%16),filename) == 0)
+		//i+2
+		char* dname = GETDIRENTNAME(removeplace,i%16);
+		
+		printk("<1> filename again:%c\n",dname);
+	    /*
+		if(strcmp(GETDIRENTNAME(removeplace,i%16),filename) == 0)
 	    {
-	      removeinode = GETDIRENTINODE(removeplace,i%16);
-	      removeplace = GETINODELOC(test,GETDIRENTINODE(removeplace,i%16),0);
-	      new = removeplace;
-	      break;
+			removeinode = GETDIRENTINODE(removeplace,i%16);
+			removeplace = GETINODELOC(test,GETDIRENTINODE(removeplace,i%16),0);
+			new = removeplace;
+			break;
 	    }
+		*/
 	}
     if(new == NULL)
 	{
 		printk("<1> it is here\n");
 		return -1;
 	}
+	/*
       // printf("have remove and dir inodes\n");
       //now have remove and dir inodes and first blocks
       if(strcmp(GETINODETYPE(test,removeinode),"dir") == 0)
@@ -711,7 +723,7 @@ int rd_unlink(char *pathname)
 			SETINODEIND(test,inode,8,NULL);
 		}
 	}
-
+*/
     return 0;
 }
 
