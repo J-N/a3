@@ -241,36 +241,6 @@ unsigned int cmd, unsigned long arg)
 
 		printk("<1> Second Inode:\t%x\n",(unsigned int)INODE(test,1));
 
-		ALLOCZERO(test, 200);
-
-		printk("<1> ISALLOC TEST:\t%d\n",ISALLOC(test,200));
-
-		ALLOCONE(test, 200);
-
-		printk("<1> ISALLOC TEST:\t%d\n",ISALLOC(test,200));
-
-		printk("<1> Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
-
-		SETINODETYPE(test,100,"reg");
-
-		SETINODESIZE(test,100,1337);
-
-		printk("<1> Inode 100 type:\t%s\nInode 100 size:\t%d\n",GETINODETYPE(test,100),GETINODESIZE(test,100));
-		
-		printk("<1> Root directory printout:\n");
-
-		printk("<1> Inode type:\t%s\n",GETINODETYPE(test,0));
-
-		printk("<1> Inode size:\t%d\n",GETINODESIZE(test,0));
-
-		printk("<1> Inode location pointer:\t%x\n",(unsigned int)GETINODELOC(test,0,0));
-
-		printk("<1> First Data Block:\t%x\n",(unsigned int)DATABLOCK(test,3));
-
-		SETINODELOC(test,0,8,test);
-
-		printk("<1> This should be superblock:\t%x\n%x\n",((unsigned int ) GETINODELOC(test,0,8)),(unsigned int)(&(*((unsigned int * )DATABLOCK(test,3)))));
-
 		printk("<1> Here goes nothing...\n");
 
 		char *hurp = vmalloc(200);
@@ -279,19 +249,21 @@ unsigned int cmd, unsigned long arg)
 		//sprintf(hurp,"/test");
 	 // rd_mkdir(hurp);
 	  
-	  for(i=0;i<20;i++)
+	  for(i=0;i<5001;i++)
 		{
 		  sprintf(hurp,"/dir%d",i);
 		  if(rd_mkdir(hurp) == -1)
 		printk("<1> error\n");
 		}
 
-	   for(i=19;i>=0;i--)
+		
+	   for(i=5000;i>=0;i--)
 		{
 		  sprintf(hurp,"/dir%d",i);
 		  if(rd_unlink(hurp) == -1)
 		printk("<1> error\n");
 		}
+		
 		//sprintf(hurp,"/test");
   // if(rd_unlink(hurp) == -1)
     // printk("<1> error\n");
@@ -353,6 +325,7 @@ static void __exit cleanup_routine(void)
 {
 	printk("<1> Unloading RamDisk Module\n");
 	remove_proc_entry("ioctl_test", &proc_root);
+	vfree(test);
 	return;
 }
 
@@ -605,7 +578,7 @@ int rd_mkdir(char *pathname)
   SETDIRENTINODE(GETINODELOC(test,inode,(GETINODESIZE(test,inode) / BLOCKSIZE)),(GETINODESIZE(test,inode)/DIRENTSIZE)%16,newinode);
   SETDIRENTNAME(GETINODELOC(test,inode,(GETINODESIZE(test,inode) / BLOCKSIZE)),(GETINODESIZE(test,inode)/DIRENTSIZE)%16,filename);
   SETINODESIZE(test,inode,GETINODESIZE(test,inode)+DIRENTSIZE);
-  
+  vfree(path2);
   return 0;
 }    
 
@@ -782,7 +755,7 @@ int rd_unlink(char *pathname)
 			SETINODEIND(test,inode,8,NULL);
 		}
 	}
-
+	vfree(path2);
     return 0;
 }
 
