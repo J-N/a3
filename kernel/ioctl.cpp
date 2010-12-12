@@ -39,6 +39,11 @@ int main () {
 			ioctl_test.field1=2;
 			valid=1;
 		}
+		if(cmd=="rm")
+		{
+			ioctl_test.field1=2;
+			valid=1;
+		}
 		if(cmd=="creat")
 		{
 			ioctl_test.field1=3;
