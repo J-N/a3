@@ -48,6 +48,8 @@ struct fileobj
 {
   int offset;
   void *inode;
+  int inodenum;
+  
 };
 
 struct fdt
@@ -311,6 +313,7 @@ int rd_open(char * pathname)
 		{
 		  ourptr->table[i].offset = 0;
 		  ourptr->table[i].inode = INODE(test,removeinode);
+		  ourptr->table[i].inodenum = removeinode;
 		  return i;
 		}
 	    }
@@ -321,6 +324,7 @@ int rd_open(char * pathname)
 	  freeptr->pid = 1337;
 	  freeptr->table[0].offset = 0;
 	  freeptr->table[0].inode = INODE(test,removeinode);
+	  freeptr->table[0].inodenum = removeinode;
 	  return 0;
 	}
 		  
@@ -374,6 +378,34 @@ int rd_lseek(int fd, int offset)
       return ourptr->table[fd].offset;
     }
 }
+
+int rd_readdir(int fd, char *address)
+{
+  int i;
+  void *blk;
+  struct fdt *ourptr = NULL;
+  for(i=0;i<20;i++)
+	{
+	  if(tablearray[i].pid == 1337)
+	    {  
+	      ourptr = &tablearray[i];
+	      break;
+	    }	  
+	}
+  if(ourptr == NULL)
+   return -1;
+  if(strcmp(GETINODETYPE(test,ourptr->table[fd].inodenum),"dir") != 0)
+    return -1;
+  blk = GETINODELOC(test,ourptr->table[fd].inodenum,ourptr->table[fd].offset / 256);
+  int blockpos = ourptr->table[fd].offset % 256;
+  int dirpos = blockpos / 16;
+  *((unsigned short *)address) = GETDIRENTINODE(blk,dirpos);
+  *((char **)(address + 2)) = GETDIRENTNAME(blk,dirpos);
+  ourptr->table[fd].offset += 16;
+  return 0;
+}
+  
+  
   
 int rd_unlink(char *pathname)
 {
@@ -830,11 +862,18 @@ rd_mkdir(hurp);*/
   sprintf(hurp,"/");
   int test2 = rd_open(hurp);
   
-  printf("lseek first fd:\t%d\nroot:\t%d\n",rd_lseek(test1,200),rd_lseek(test2,200));
-  printf("should be file2 inode:\t%x\n",(unsigned int)tablearray[19].table[0].inode);
-  printf("is actually file2 inode:\t%x\n",(unsigned int)INODE(test,3));
+  //printf("lseek first fd:\t%d\nroot:\t%d\n",rd_lseek(test1,200),rd_lseek(test2,200));
+  //printf("should be file2 inode:\t%x\n",(unsigned int)tablearray[19].table[0].inode);
+  //printf("is actually file2 inode:\t%x\n",(unsigned int)INODE(test,3));
    
-  printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
+  //printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
+  char *testspace = malloc(20);
+  for(i=0;i<1000;i++)
+    {
+      if(rd_readdir(test2,testspace) == -1)
+	printf("error\n");
+      printf("inode:\t%hu\nname:\t%s\n",*((unsigned short *) testspace), *((char **)(testspace + 2)));
+    }
   /*
    sprintf(hurp,"/test");
    if(rd_unlink(hurp) == -1)
