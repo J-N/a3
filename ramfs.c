@@ -699,12 +699,14 @@ int rd_creat(char *pathname)
 {
   const char *delim = "/";
   char *result = NULL;
+  int k = 0;
   char *filename = NULL;
   char *path2 = malloc(400);
   strcpy(path2,pathname);
   result = strtok(path2, delim);
   while(result != NULL)
     {
+      k++;
       filename = result;
       result = strtok(NULL,delim);
     }
@@ -715,22 +717,24 @@ int rd_creat(char *pathname)
   void *place = GETINODELOC(test,0,0);
   int newinode = -1;
   int numdirent;
+  int l = 0;
   void *new = NULL;
   int i;
   int j = 1;
   //check path, store inode # of dir to put file into in inode, and place as its current location.
   while(result != NULL)
     {
+      l++;
       numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
       j=1;
       for(i=0;i<numdirent;i++)
 	{
-	  if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+	  if(i>= j*(BLOCKSIZE/DIRENTSIZE) && l!=k)
 	    {
 	      place = GETINODELOC(test,inode,j);
 	      j++;
 	    }
-	  if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"dir") == 0)
+	  if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"dir") == 0 && l!=k)
 	    {
 	      inode = GETDIRENTINODE(place,i%16);
 	      place = GETINODELOC(test,GETDIRENTINODE(place,i%16),0);
@@ -747,6 +751,35 @@ int rd_creat(char *pathname)
       new = NULL;
     }
   printf("Inode where it will be created:%d\n",inode);
+  
+   numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+      //printf("inode:%d\n",inode);
+      //printf("numdirent:%d\n",numdirent);
+      j=1;
+      void *fileplace = place;
+      int fileinode = inode;
+      new = NULL;
+      for(i=0;i<numdirent;i++)
+	{
+	   if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+	    {
+	      fileplace = GETINODELOC(test,fileinode,j);
+	      j++;
+	    }
+	   //printf("filename again:%s\n",GETDIRENTNAME(removeplace,i+2));
+	    if(strcmp(GETDIRENTNAME(place,i%16),filename) == 0)
+	    {
+	      fileinode = GETDIRENTINODE(fileplace,i%16);
+	      fileplace = GETINODELOC(test,GETDIRENTINODE(fileplace,i%16),0);
+	      new = fileplace;
+	      break;
+	    }
+	}
+      if(new != NULL)
+	{
+	  printf("it is here\n");
+	  return -1;
+	}
   //find a free block for the new file
   for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
     {
@@ -810,11 +843,13 @@ int rd_mkdir(char *pathname)
   char *result = NULL;
   char *filename = NULL;
   char *path2 = malloc(400);
+  int k = 0;
   strcpy(path2,pathname);
   result = strtok(path2, delim);
   
   while(result != NULL)
     {
+      k++;
       filename = result;
       result = strtok(NULL,delim);
     }
@@ -827,20 +862,22 @@ int rd_mkdir(char *pathname)
   int numdirent;
   void *new = NULL;
   int i;
+  int l = 0;
   int j = 1;
   //check path, store inode # of dir to put file into in inode, and place as its current location.
   while(result != NULL)
     {
+      l++;
       numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
       j=1;
       for(i=0;i<numdirent;i++)
 	{
-	  if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+	  if(i>= j*(BLOCKSIZE/DIRENTSIZE) && l!=k)
 	    {
 	      place = GETINODELOC(test,inode,j);
 	      j++;
 	    }
-	  if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"dir") == 0)
+	  if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"dir") == 0 && l!=k)
 	    {
 	      inode = GETDIRENTINODE(place,i%16);
 	      place = GETINODELOC(test,GETDIRENTINODE(place,i%16),0);
@@ -858,6 +895,35 @@ int rd_mkdir(char *pathname)
 	}
       new = NULL;
     }
+
+   numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+      //printf("inode:%d\n",inode);
+      //printf("numdirent:%d\n",numdirent);
+      j=1;
+      void *fileplace = place;
+      int fileinode = inode;
+      new = NULL;
+      for(i=0;i<numdirent;i++)
+	{
+	   if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+	    {
+	      fileplace = GETINODELOC(test,fileinode,j);
+	      j++;
+	    }
+	   //printf("filename again:%s\n",GETDIRENTNAME(removeplace,i+2));
+	    if(strcmp(GETDIRENTNAME(place,i%16),filename) == 0)
+	    {
+	      fileinode = GETDIRENTINODE(fileplace,i%16);
+	      fileplace = GETINODELOC(test,GETDIRENTINODE(fileplace,i%16),0);
+	      new = fileplace;
+	      break;
+	    }
+	}
+      if(new != NULL)
+	{
+	  printf("it is here\n");
+	  return -1;
+	}
   //find a free block for the new file
   for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
     {
@@ -975,6 +1041,9 @@ rd_mkdir(hurp);*/
   */
   
   sprintf(hurp,"/file2");
+  if(rd_mkdir(hurp) == -1)
+    printf("error\n"); 
+  sprintf(hurp,"/file2");
   if(rd_creat(hurp) == -1)
     printf("error\n");
   int test1 = rd_open(hurp);
@@ -996,7 +1065,7 @@ rd_mkdir(hurp);*/
       printf("inode:\t%hu\nname:\t%s\n",*((unsigned short *) testspace), *((char **)(testspace + 2)));
     }
   */
-  sprintf(hurp,"123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890");
+  /*  sprintf(hurp,"123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890");
   int writenum;
   for(i=0;i<6710;i++)
     {
@@ -1011,7 +1080,7 @@ rd_mkdir(hurp);*/
   rd_close(test1);
   sprintf(hurp,"/file2");
   rd_unlink(hurp);
-
+  */
   /*
    sprintf(hurp,"/test");
    if(rd_unlink(hurp) == -1)
