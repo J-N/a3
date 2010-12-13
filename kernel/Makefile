@@ -20,5 +20,7 @@ userlib:
 	ar rc libramfs.a ioctl.o
 	ranlib libramfs.a
 
-usertest: libramfs.a
+usertest: userlib
 	g++ -g test1.cpp -L. -lramfs -o test1
+	g++ -g maxfiles.cpp -L. -lramfs -o maxfiles
+	g++ -g maxsize.cpp -L. -lramfs -o maxsize
