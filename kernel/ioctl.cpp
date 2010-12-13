@@ -8,61 +8,107 @@
 using namespace std;
 
 #define IOCTL_TEST _IOW(0, 6, struct ioctl_test_t)
-int main () {
 
-	/* attribute structures */
+/* attribute structures */
 	struct ioctl_test_t {
 	int field1;
 	string field2;
+	int field3; //pid
+	string field4;
+	int field5;
+	int field6; //return
 	} ioctl_test;
 
+int iosetup()
+{
+	int pid = (int) getpid();
+	ioctl_test.field3=pid;
 	int fd = open ("/proc/ioctl_test", O_RDONLY);
-	string cmd,arg;
-	cout<<"Welcome to the RAM File System"<<endl;
-	//cout<<""<<endl;
-	while(1)
+	return fd;
+}
+void io()
+{
+	int fd = iosetup();
+	int io2=ioctl (fd, IOCTL_TEST, &ioctl_test);
+	if(io2==-1)
 	{
-		cin>>cmd>>ioctl_test.field2;
-		//switch to space based
-		size_t found=cmd.find(" "); 
-		//if (found!=string::npos)
-		//arg=cmd.substr(found);
-		//cmd=cmd.substr(0,found);
-		int valid=0,io=-1;
-		if(cmd=="mkdir")
-		{
-			ioctl_test.field1=1;
-			valid=1;
-		}
-		if(cmd=="rmdir")
-		{
-			ioctl_test.field1=2;
-			valid=1;
-		}
-		if(cmd=="rm")
-		{
-			ioctl_test.field1=2;
-			valid=1;
-		}
-		if(cmd=="creat")
-		{
-			ioctl_test.field1=3;
-			valid=1;
-		}
-		if(valid==1)
-		{
-			io=ioctl (fd, IOCTL_TEST, &ioctl_test);
-			valid=0;
-			if(io==-1)
-			{
-				cout<<"ioctl failed: "<<errno<<endl;
-				perror(NULL);
-			}
-		}
-		else
-		{
-			cout<<cmd<<" is not a valid command"<<endl;
-		}
+		cout<<"ioctl failed: "<<errno<<endl;
+		perror(NULL);
 	}
-  return 0;
+}
+
+int rd_mkdir(char *pathname)
+{
+	ioctl_test.field1=1;
+	ioctl_test.field2=pathname;
+	io();
+	
+	return ioctl_test.field6;
+}
+
+int rd_unlink(char *pathname)
+{
+	ioctl_test.field1=2;
+	ioctl_test.field2=pathname;
+	io();
+	return ioctl_test.field6;
+}
+
+int rd_creat(char *pathname)
+{
+	ioctl_test.field1=3;
+	ioctl_test.field2=pathname;
+	io();
+	return ioctl_test.field6;
+}
+int rd_open(char *pathname)
+{
+	ioctl_test.field1=4;
+	ioctl_test.field2=pathname;
+	io();
+	return ioctl_test.field6;
+}
+int rd_readdir(int fd, char *address)
+{
+	ioctl_test.field1=5;
+	ioctl_test.field5=fd;
+	ioctl_test.field4=address;
+	io();
+	printf("Name: %s\n",*((char **)(address + 2)));
+	return ioctl_test.field6;
+}
+
+int main () 
+{
+	int result = rd_mkdir("/hi");
+	if(result != 0)
+	{
+		cout<<"Error Creating Directory test"<<endl;
+	}
+	result = rd_mkdir("/hi/test");
+	if(result != 0)
+	{
+		cout<<"Error Creating Directory hi"<<endl;
+	}
+	int fd = rd_open("/hi");
+	if(result != -1)
+	{
+		cout<<"file descriptor for /hi is: "<<fd<<endl;
+	}
+	int fd2 = rd_open("/hi/test");
+	if(result != -1)
+	{
+		cout<<"file descriptor for /test is: "<<fd2<<endl;
+	}
+	int fd3 = rd_open("/");
+	if(result != -1)
+	{
+		cout<<"file descriptor for / is: "<<fd3<<endl;
+	}
+	
+	char *testspace = (char *)malloc(20);
+	rd_readdir(fd,testspace);
+	free(testspace);
+	
+	return 0;
 }

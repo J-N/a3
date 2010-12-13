@@ -7,8 +7,9 @@
 #include <linux/tty.h>
 #include <linux/vmalloc.h>
 #include <linux/string.h>
+#include <linux/sched.h>
 
-/* c-code -- Cant use in Kernel
+/* c-code -- Cant use in Kernel lol
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
@@ -57,9 +58,27 @@
 #define GETBLOCKFROMPTR(start,ptr) ((ptr - DATABLOCK(start,0)) / BLOCKSIZE) 
 
 /* attribute structures */
+struct fileobj
+{
+  int offset;
+  void *inode;
+  int inodenum;
+  
+};
+
+struct fdt
+{
+  int pid;
+  struct fileobj table[20];
+};
+
 struct ioctl_test_t {
   int field1;
   int field2;
+  int field3;
+  int field4;
+  int field5;
+  int field6;
 };
 
 #define IOCTL_TEST _IOW(0, 6, struct ioctl_test_t)
@@ -73,8 +92,12 @@ void *initialize();
 int rd_mkdir(char *pathname);
 int rd_creat(char *pathname);
 int rd_unlink(char *pathname);
+int rd_open(char * pathname,int pid);
+int rd_readdir(int fd, char *address, int pid);
+
 
 void *test; //our filesystem in main
+struct fdt tablearray[20];
 
 void my_printk(char *string) 
 { 
@@ -241,20 +264,59 @@ unsigned int cmd, unsigned long arg)
 	switch (cmd){
 
 	case IOCTL_TEST:
-		copy_from_user(&ioc, (struct ioctl_test_t *)arg, 
-		sizeof(struct ioctl_test_t));
+		copy_from_user(&ioc, (struct ioctl_test_t *)arg,sizeof(struct ioctl_test_t));
+		
 		int f1 = ioc.field1;
 		char *f2 = (char *)ioc.field2;
+		int pid = ioc.field3;
+		char *f4 = (char *)ioc.field4;
+		int f5 = ioc.field5;
+		int f6 = ioc.field6;
 		
-		printk("<1> Recieved Ioctol call\n");
+		printk("<1> Recieved ioctol call from pid:%d\n",pid);
 
+		int tableent=-1;
+		int i;
 		char *hurp = vmalloc(200);
+		//search to see if current pid already has an entry
+		for(i=0;i<20;i++)
+		{
+			if(tablearray[i].pid!=-31337)//check to see if process is still alive
+			{
+				struct task_struct *old = find_task_by_pid(tablearray[i].pid);
+				if(old==NULL)//process died
+				{
+					printk("<1> Process: %d has died... Clearing slot: %d\n",tablearray[i].pid,i);
+					tablearray[i].pid=-31337;
+				}
+			}
+			if(tablearray[i].pid==pid) //found entry
+			{
+				tableent=i;
+				printk("<1> Pid already has table at:%d\n",tableent);
+				break;
+			}
+		}
+		if(tableent==-1)//check to see if we already have entry, if not find an entry
+		{
+			//printk("<1> table ent:%d\n",tableent);
+			for(i=0;i<20;i++)
+			{
+				if(tablearray[i].pid==-31337) //empty entry
+				{
+					printk("<1> table created at:%d\n",i);
+					tablearray[i].pid=pid; //set pid
+					break;
+				}
+			}
+		}
 		
 		if(f1==1)
 		{
-			sprintf(hurp,"/%s",f2);
-			printk("<1> Creating dir %s\n",hurp);
-			if(rd_mkdir(hurp) == -1)
+			//sprintf(hurp,"/%s",f2);
+			printk("<1> Creating dir %s\n",f2);
+			f6=rd_mkdir(f2);
+			if(f6 == -1)
 			{
 				printk("<1> error\n");
 			}
@@ -263,7 +325,8 @@ unsigned int cmd, unsigned long arg)
 		{
 			sprintf(hurp,"/%s",f2);
 			printk("<1> Removing %s\n",hurp);
-			if(rd_unlink(hurp) == -1)
+			f6=rd_unlink(hurp);
+			if(f6 == -1)
 			{
 				printk("<1> error\n");
 			}
@@ -272,12 +335,36 @@ unsigned int cmd, unsigned long arg)
 		{
 			sprintf(hurp,"/%s",f2);
 			printk("<1> Creating file %s\n",hurp);
-			if(rd_creat(hurp) == -1)
+			f6=rd_creat(hurp);
+			if(f6 == -1)
 			{
 				printk("<1> error\n");
 			}
 		}
+		if(f1==4)
+		{
+			sprintf(hurp,"%s",f2);
+			f6=rd_open(hurp);
+		}
+		if(f1==5)
+		{
+			int test2 = f5;
+			printk("fd: %d",test2);
+			char* temp = (char*) vmalloc(20);
+			//f4
+			f6=rd_readdir(test2,temp,pid);
+			if(f6 == -1)
+			{
+				printk("<1> error\n");
+			}
+			
+			copy_to_user(f4,temp,sizeof(temp));
+			vfree(temp);
+			//printk("<1> inode:\t%hu\nname:\t%s\n",*((unsigned short *) f4), *((char **)(f4 + 2)));
+		}
 		printk("<1> Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
+		ioc.field6=f6; //set the return
+		copy_to_user((struct ioctl_test_t *)arg,&ioc,sizeof(struct ioctl_test_t));
 		break;
 
 	default:
@@ -314,7 +401,219 @@ void *initialize()
 	SETINODELOC(filesys,0,0,DATABLOCK(filesys,0));
 	ALLOCONE(filesys,0);
 	//SETINODEIND(filesys,0,8,DATABLOCK(filesys,3));  //test indirect ref
+	for(i=0;i<20;i++)
+	{
+		tablearray[i].pid = -31337;
+	}
 	return filesys;
+}
+
+int rd_open(char * pathname, int pid)
+{
+  
+  const char *delim = "/";
+  char *result = NULL;
+  char *filename = NULL;
+  char *path2 = vmalloc(400);
+  int root = 0;
+  if(strcmp(pathname, "/") == 0)
+    root = 1;
+  int k =0;
+  strcpy(path2,pathname);
+  result = strsep(&path2, delim);
+  result = strsep(&path2, delim);
+  while(result != NULL)
+    {
+      k++;
+      filename = result;
+      result = strsep(&path2, delim);
+    }
+  printk("<1> Filename:\t%s\n",filename); // debug
+  vfree(path2);
+  result = strsep(&pathname, delim);
+  result = strsep(&pathname, delim);
+  int inode = 0;
+  void *place = GETINODELOC(test,0,0);
+  void *new = NULL;
+  int removeinode = 0;
+  void *removeplace = NULL;
+  int numdirent;
+  int i;
+  int l=0; //John: may have to be set to 1 in kernel
+  int j = 1;
+  while(result != NULL)
+    {
+      l++;
+      j=1;
+      numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+      for(i=0;i<numdirent && l!=k;i++)
+	{
+	  if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+	    {
+	      place = GETINODELOC(test,inode,j);
+	      j++;
+	    }
+	  if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"dir") == 0  && l!=k)
+	    {
+	      inode = GETDIRENTINODE(place,i%16);
+	      place = GETINODELOC(test,GETDIRENTINODE(place,i%16),0);
+	      new = place;
+	      break;
+	    }
+	}
+
+      result = strsep(&pathname, delim);
+      
+      if(new == NULL && result != NULL) //Then we have no directory match
+	return -1;
+      new = NULL;
+    }
+  //printf("have directory inodes\n");
+  //now we have a directory in place and its inode in inode
+      numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+      //printf("inode:%d\n",inode);
+      //printf("numdirent:%d\n",numdirent);
+      j=1;
+      removeplace = place;
+      removeinode = inode;
+      new = NULL;
+      for(i=0;i<numdirent;i++)
+	{
+	   if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+	    {
+	      removeplace = GETINODELOC(test,removeinode,j);
+	      j++;
+	    }
+	   if(root)
+	     break;
+	   //printf("filename again:%s\n",GETDIRENTNAME(removeplace,i+2));
+	    if(strcmp(GETDIRENTNAME(removeplace,i%16),filename) == 0)
+	    {
+	      removeinode = GETDIRENTINODE(removeplace,i%16);
+	      removeplace = GETINODELOC(test,GETDIRENTINODE(removeplace,i%16),0);
+	      new = removeplace;
+	      break;
+	    }
+	}
+      if(new == NULL && !root)
+	{
+	  printk("<1> it is here\n");
+	  return -1;
+	}
+      struct fdt *freeptr = NULL;
+      struct fdt *ourptr = NULL;
+      for(i=0;i<20;i++)
+	{
+	  if(tablearray[i].pid == pid)
+	    {  
+	      ourptr = &tablearray[i];
+	      break;
+	    }
+	  if(tablearray[i].pid == -31337)
+	    {
+	      freeptr = &tablearray[i];
+	      //printf("table entry:\t%i\n",i);
+	    }
+	}
+      if(freeptr == NULL && ourptr == NULL)
+	return -1;
+      if(ourptr != NULL)
+	{
+	  for(i=0;i<20;i++)
+	    {
+	      if(ourptr->table[i].inode == NULL)
+		{
+		  ourptr->table[i].offset = 0;
+		  ourptr->table[i].inode = INODE(test,removeinode);
+		  ourptr->table[i].inodenum = removeinode;
+		  return i;
+		}
+	    }
+	  return -1;
+	}
+      else
+	{
+	  freeptr->pid = pid;
+	  freeptr->table[0].offset = 0;
+	  freeptr->table[0].inode = INODE(test,removeinode);
+	  freeptr->table[0].inodenum = removeinode;
+	  return 0;
+	}
+
+}
+int rd_close(int fd,pid)
+{
+  int i;
+  struct fdt *ourptr = NULL;
+  for(i=0;i<20;i++)
+	{
+	  if(tablearray[i].pid == pid)
+	    {  
+	      ourptr = &tablearray[i];
+	      break;
+	    }	  
+	}
+  if(ourptr == NULL)
+    return -1;
+  if(ourptr->table[fd].inode == NULL)
+    return -1;
+  else
+    {
+      ourptr->table[fd].inode = NULL;
+      return 0;
+    }
+}
+
+int rd_lseek(int fd, int offset)
+{
+  int i;
+  struct fdt *ourptr = NULL;
+  for(i=0;i<20;i++)
+	{
+	  if(tablearray[i].pid == pid)
+	    {  
+	      ourptr = &tablearray[i];
+	      break;
+	    }	  
+	}
+  if(ourptr == NULL)
+   return -1;
+  if(offset > *((int *) (ourptr->table[fd].inode)))
+    {
+      ourptr->table[fd].offset = *((int *) (ourptr->table[fd].inode));
+      return ourptr->table[fd].offset;
+    }
+  else
+    {
+      ourptr->table[fd].offset = offset;
+      return ourptr->table[fd].offset;
+    }
+}
+
+int rd_readdir(int fd, char *address, int pid)
+{
+  int i;
+  void *blk;
+  struct fdt *ourptr = NULL;
+  for(i=0;i<20;i++)
+	{
+	  if(tablearray[i].pid == pid)
+	    {  
+	      ourptr = &tablearray[i];
+	      break;
+	    }	  
+	}
+  if(ourptr == NULL)
+   return -1;
+  if(strcmp(GETINODETYPE(test,ourptr->table[fd].inodenum),"dir") != 0)
+    return -1;
+  blk = GETINODELOC(test,ourptr->table[fd].inodenum,ourptr->table[fd].offset / 256);
+  int blockpos = ourptr->table[fd].offset % 256;
+  int dirpos = blockpos / 16;
+  *((unsigned short *)address) = GETDIRENTINODE(blk,dirpos);
+  *((char **)(address + 2)) = GETDIRENTNAME(blk,dirpos);
+  ourptr->table[fd].offset += 16;
+  return 0;
 }
 
 int rd_creat(char *pathname)
