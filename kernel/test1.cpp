@@ -7,7 +7,7 @@ int rd_mkdir(char *pathname);
 int rd_creat(char *pathname);
 int rd_unlink(char *pathname);
 int rd_open(char * pathname);
-int rd_close(int fd, int pid);
+int rd_close(int fd);
 int rd_lseek(int fd, int offset);
 int rd_readdir(int fd, char *address);
 int rd_write(int fd, char *address, int num_bytes);
@@ -25,7 +25,7 @@ int main ()
 	{
 		cout<<"Error Creating file test"<<endl;
 	}
-
+	
 	int fd = rd_open("/hi");
 	if(result != -1)
 	{
@@ -64,6 +64,19 @@ char *rresult = (char *)malloc(10);
 		cout<<"bytes read: "<<result<<endl;
 		cout<<"read returned: "<<rresult<<endl;
 		
+	rd_close(fd);
+	rd_close(fd2);
+	rd_close(fd3);
+	result = rd_unlink("/hi/test");
+	if(result != 0)
+	{
+		cout<<"Error removing test"<<endl;
+	}
+	result = rd_unlink("/hi");
+	if(result != 0)
+	{
+		cout<<"Error removing hi"<<endl;
+	}
 	
 	return 0;
 }
