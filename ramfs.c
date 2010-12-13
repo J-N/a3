@@ -169,7 +169,9 @@ void *SETINODELOC(void *start, int num, int locnum, void *ptr)
 	      SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
 	  }
 	  void *lvl2 = *((void **) lvl1) + 4*((locnum-72)%64);
+
 	  *((void **)lvl2) = ptr;
+	  printf("%x %x\n",(unsigned int) lvl2, *((unsigned int *)lvl2));
 	}
      
     }
@@ -481,7 +483,7 @@ int rd_write(int fd, char *address, int num_bytes)
     {
       size = GETINODESIZE(test,ourptr->table[fd].inodenum);
       //do we need to allocate a new block?
-      if((ourptr->table[fd].offset / 256) > (size - 1) / 256)
+      if((ourptr->table[fd].offset / 256) > (size - 1) / 256 && size != 0)
 	{
 	        void *newdirblock = NULL;
       for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
@@ -629,6 +631,8 @@ int rd_unlink(char *pathname)
       //remove single indirect index blocks
       if(removeblocks > 8)
 	{
+	  for(i=0;i<256;i++)
+	    ((char *)GETINODEIND(test,removeinode,8))[i] = '\0';
 	  ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODEIND(test,removeinode,8)));
 	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
 	  printf("removing indirect block\n");
@@ -641,11 +645,17 @@ int rd_unlink(char *pathname)
 	    {
 	      if(i <= (((GETINODESIZE(test,removeinode) - 1)/256) - 72)/64)
 		{
+		  int g;
+		  for(g=0;g<256;g++)
+		    ((char *)(void *)(*((unsigned int *) doubleind + i)))[g] = '\0';
 		  ALLOCZERO(test,GETBLOCKFROMPTR(test,(void *)(*((unsigned int *) doubleind + i))));
 		  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
 		  printf("remove blk ptr %d\n",i);
 		}
 	    }
+	  void * fff = doubleind;
+	  for(g=0;g<256;g++)
+	    ((char *)fff)[g] = '\0';
 	  ALLOCZERO(test,GETBLOCKFROMPTR(test,doubleind));
 	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
 	  printf("remove doubleind magic\n");
@@ -1025,7 +1035,7 @@ int main(int argc, char** argv)
   /*  
 sprintf(hurp,"/test");
 rd_mkdir(hurp);*/
-  /*
+  /*  
   for(i=0;i<1023;i++)
     {
       sprintf(hurp,"/file%d",i);
@@ -1040,30 +1050,32 @@ rd_mkdir(hurp);*/
 	printf("error\n");
     }
   */
-  
-  sprintf(hurp,"/file2");
+  /*
+  sprintf(hurp,"/dir2");
   if(rd_mkdir(hurp) == -1)
     printf("error\n"); 
-  sprintf(hurp,"/file2");
+  sprintf(hurp,"/dir2/file");
   if(rd_creat(hurp) == -1)
     printf("error\n");
+  
+  sprintf(hurp,"/dir2/file");
   int test1 = rd_open(hurp);
   //rd_close(test1);
 
   sprintf(hurp,"/");
   int test2 = rd_open(hurp);
-  
+  */
   //printf("lseek first fd:\t%d\nroot:\t%d\n",rd_lseek(test1,200),rd_lseek(test2,200));
   //printf("should be file2 inode:\t%x\n",(unsigned int)tablearray[19].table[0].inode);
   //printf("is actually file2 inode:\t%x\n",(unsigned int)INODE(test,3));
    
   //printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
-  char *testspace = malloc(20);
- 
-      if(rd_readdir(test2,testspace) == -1)
-	printf("error\n");
-      printf("inode:\t%hu\nname:\t%s\n",*((unsigned short *) testspace), (char *) testspace + 2);
-  /*  sprintf(hurp,"123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890");
+  sprintf(hurp,"/file");
+  if(rd_creat(hurp) == -1)
+    printf("error\n");
+  int test1 = rd_open(hurp);
+  
+    sprintf(hurp,"123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890");
   int writenum;
   for(i=0;i<6710;i++)
     {
@@ -1072,13 +1084,13 @@ rd_mkdir(hurp);*/
   writenum = rd_write(test1,hurp,184);
   printf("writenum:\t%d\nfilesize:\t%d\n",writenum,GETINODESIZE(test,1));
   char *read_results = malloc(20);
-  rd_lseek(test1,0);
+  int seek = rd_lseek(test1,0);
   int readtest = rd_read(test1,read_results,10);
-  printf("Read status %d:\t%s\n",readtest, read_results);
+  printf("Read status seek %d %d:\t%s\n",seek,readtest, read_results);
   rd_close(test1);
   sprintf(hurp,"/file2");
   rd_unlink(hurp);
-  */
+
   /*
    sprintf(hurp,"/test");
    if(rd_unlink(hurp) == -1)
