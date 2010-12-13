@@ -15,5 +15,10 @@ clean:
 $(EXE): $(OBJS)
 	$(CXX) $(OBJS) -o $@
 
-.cpp.o:
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+userlib:
+	g++ -g ioctl.cpp -c -o ioctl.o
+	ar rc libramfs.a ioctl.o
+	ranlib libramfs.a
+
+usertest: libramfs.a
+	g++ -g test1.cpp -L. -lramfs -o test1
