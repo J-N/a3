@@ -397,14 +397,65 @@ int rd_readdir(int fd, char *address)
    return -1;
   if(strcmp(GETINODETYPE(test,ourptr->table[fd].inodenum),"dir") != 0)
     return -1;
+  if(ourptr->table[fd].offset > GETINODESIZE(test,ourptr->table[fd].inodenum))
+    return 0;
   blk = GETINODELOC(test,ourptr->table[fd].inodenum,ourptr->table[fd].offset / 256);
   int blockpos = ourptr->table[fd].offset % 256;
   int dirpos = blockpos / 16;
   *((unsigned short *)address) = GETDIRENTINODE(blk,dirpos);
   *((char **)(address + 2)) = GETDIRENTNAME(blk,dirpos);
   ourptr->table[fd].offset += 16;
-  return 0;
+  return 1;
 }
+
+int rd_read(int fd, char *address, int num_bytes)
+{
+  
+  int i;
+  int bytes_left = num_bytes;
+  int size;
+  void *blk;
+  struct fdt *ourptr = NULL;
+  for(i=0;i<20;i++)
+	{
+	  if(tablearray[i].pid == 1337)
+	    {  
+	      ourptr = &tablearray[i];
+	      break;
+	    }	  
+	}
+  if(ourptr == NULL)
+   return 0;
+  if(strcmp(GETINODETYPE(test,ourptr->table[fd].inodenum),"reg") != 0)
+    return 0;
+   while(bytes_left > 0)
+    {
+      size = GETINODESIZE(test,ourptr->table[fd].inodenum);
+      //do we need to allocate a new block?
+      if((ourptr->table[fd].offset / 256) > (size - 1) / 256)
+	{
+	  return num_bytes - bytes_left;
+	}
+      //ok, we're set up with a new block
+	  
+      blk = GETINODELOC(test,ourptr->table[fd].inodenum,(ourptr->table[fd].offset / 256));
+      int blockpos = ourptr->table[fd].offset % 256;
+      for(i=blockpos;i<256;i++)
+	{
+	  *((unsigned char *) address++) = *((unsigned char *) blk + i);
+	  bytes_left --;
+	  ourptr->table[fd].offset ++;
+	  if(ourptr->table[fd].offset > GETINODESIZE(test,ourptr->table[fd].inodenum) - 1)
+	    {
+	      return num_bytes - bytes_left;
+	    }
+	  if(bytes_left == 0)
+	    return num_bytes;
+	}
+    }
+  return num_bytes;
+}
+ 
   
 int rd_write(int fd, char *address, int num_bytes)
 {
@@ -922,9 +973,6 @@ rd_mkdir(hurp);*/
 	printf("error\n");
     }
   */
-   sprintf(hurp,"/file1");
-  if(rd_creat(hurp) == -1)
-    printf("error\n");
   
   sprintf(hurp,"/file2");
   if(rd_creat(hurp) == -1)
@@ -956,11 +1004,14 @@ rd_mkdir(hurp);*/
     }
   writenum = rd_write(test1,hurp,184);
   printf("writenum:\t%d\nfilesize:\t%d\n",writenum,GETINODESIZE(test,1));
+  char *read_results = malloc(20);
+  rd_lseek(test1,0);
+  int readtest = rd_read(test1,read_results,10);
+  printf("Read status %d:\t%s\n",readtest, read_results);
   rd_close(test1);
   sprintf(hurp,"/file2");
   rd_unlink(hurp);
-  sprintf(hurp,"/file1");
-  rd_unlink(hurp);
+
   /*
    sprintf(hurp,"/test");
    if(rd_unlink(hurp) == -1)
