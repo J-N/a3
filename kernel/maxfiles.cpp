@@ -15,9 +15,10 @@ int rd_read(int fd, char *address, int num_bytes);
 
 int main () 
 {
+//1023
 	int i=0;
 	char* name= (char*)malloc(20);
-	for(i=0;i<1023;i++)
+	for(i=0;i<3;i++)
 	{
 		sprintf(name,"/file%d",i);
 		int result = rd_creat(name);
@@ -26,7 +27,7 @@ int main ()
 			cout<<"Error creating file"<<i<<endl;
 		}
 	}
-	for(i=1022;i<=0;i--)
+	for(i=0;i<3;i++)
 	{
 		sprintf(name,"/file%d",i);
 		int result = rd_unlink(name);

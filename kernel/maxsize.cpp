@@ -17,22 +17,24 @@ int main ()
 {
 	int i=0;
 
-
 	int result = rd_creat("/bigfile");
 	if(result != 0)
 	{
 		cout<<"Error creating file"<<endl;
 	}
 	int fd = rd_open("/bigfile");
-	char* big = (char*)malloc(2013184);
-	while(strlen(big)<2013185)
+	char* big = (char*)malloc(1);
+
+	int write;
+	for(i=0;i<2013184;i++)
 	{
-		sprintf(big,"%sJ",big);
+		big[0]='j';
+		write = rd_write(fd,big,1);
 	}
-	int write = rd_write(fd,big,2013184);
-	cout<<"wrote "<<write<<" bytes"<<endl;
+	//cout<<"wrote "<<write<<" bytes"<<endl;
 	
 	char* bigr = (char*) malloc(2013184);
+	rd_lseek(fd,0);
 	int read = rd_read(fd,bigr,2013184);
 	cout<<"read "<<read<<" bytes"<<endl;
 	int t;
