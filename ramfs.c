@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 //Constants
+//max file size 2013184
 #define FSSIZE 2097152 //2MB
 #define BLOCKSIZE 256
 #define INODEBLOCKS 256
@@ -405,6 +406,65 @@ int rd_readdir(int fd, char *address)
   return 0;
 }
   
+int rd_write(int fd, char *address, int num_bytes)
+{
+  int i;
+  int bytes_left = num_bytes;
+  int size;
+  void *blk;
+  struct fdt *ourptr = NULL;
+  for(i=0;i<20;i++)
+	{
+	  if(tablearray[i].pid == 1337)
+	    {  
+	      ourptr = &tablearray[i];
+	      break;
+	    }	  
+	}
+  if(ourptr == NULL)
+   return 0;
+  if(strcmp(GETINODETYPE(test,ourptr->table[fd].inodenum),"reg") != 0)
+    return 0;
+  while(bytes_left > 0)
+    {
+      size = GETINODESIZE(test,ourptr->table[fd].inodenum);
+      //do we need to allocate a new block?
+      if((ourptr->table[fd].offset / 256) > (size - 1) / 256)
+	{
+	        void *newdirblock = NULL;
+      for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
+	{
+	  if(~ISALLOC(test,i))
+	    {
+	      newdirblock= DATABLOCK(test,i);
+	      ALLOCONE(test,i);
+	      SETINODELOC(test,ourptr->table[fd].inodenum,(GETINODESIZE(test,ourptr->table[fd].inodenum) / 256),newdirblock);
+	      break;
+	    }
+	}
+      if(newdirblock == NULL)
+	return num_bytes - bytes_left;
+      SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
+	}
+      //ok, we're set up with a new block
+	  
+      blk = GETINODELOC(test,ourptr->table[fd].inodenum,(ourptr->table[fd].offset / 256));
+      int blockpos = ourptr->table[fd].offset % 256;
+      for(i=blockpos;i<256;i++)
+	{
+	  *((unsigned char *) blk + i) = *((unsigned char *) address++);
+	  bytes_left --;
+	  ourptr->table[fd].offset ++;
+	  if(ourptr->table[fd].offset > GETINODESIZE(test,ourptr->table[fd].inodenum) - 1)
+	    {
+	      SETINODESIZE(test,ourptr->table[fd].inodenum,GETINODESIZE(test,ourptr->table[fd].inodenum) + 1);
+	    }
+	  if(bytes_left == 0)
+	    return num_bytes;
+	}
+    }
+  return num_bytes;
+}
   
   
 int rd_unlink(char *pathname)
@@ -500,7 +560,7 @@ int rd_unlink(char *pathname)
 	  return -1;
       if(removeinode == 0)
 	return -1;
-      int removeblocks = GETINODESIZE(test,removeinode) / BLOCKSIZE;
+      int removeblocks = (GETINODESIZE(test,removeinode) + 255) / BLOCKSIZE;
       //remove data blocks
       if(removeblocks == 0)
 	{
@@ -512,25 +572,31 @@ int rd_unlink(char *pathname)
 	{
 	  ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODELOC(test,removeinode,i)));
 	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
-	  printf("Removing location block\n");
+	  printf("Removing location block %d\n",i);
 	}
       //remove single indirect index blocks
-      if(removeblocks > 7)
+      if(removeblocks > 8)
 	{
 	  ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODEIND(test,removeinode,8)));
 	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+	  printf("removing indirect block\n");
 	}
       //remove double indirect index blocks
-      if(removeblocks > 71)
+      if(removeblocks > 72)
 	{
 	  void * doubleind = GETINODEIND(test,removeinode,9);
 	  for(i=0;i<64;i++)
 	    {
-	      ALLOCZERO(test,GETBLOCKFROMPTR(test,(void *)(*((unsigned int *) doubleind + i))));
-	      SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+	      if(i <= (((GETINODESIZE(test,removeinode) - 1)/256) - 72)/64)
+		{
+		  ALLOCZERO(test,GETBLOCKFROMPTR(test,(void *)(*((unsigned int *) doubleind + i))));
+		  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+		  printf("remove blk ptr %d\n",i);
+		}
 	    }
 	  ALLOCZERO(test,GETBLOCKFROMPTR(test,doubleind));
 	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+	  printf("remove doubleind magic\n");
   
 	}
       //remove inode
@@ -821,7 +887,7 @@ int main(int argc, char** argv)
   printf("First Data Block:\t%x\n",(unsigned int)DATABLOCK(test,3));
   //void *hee = GETINODELOC(test,0,1);
   printf("Here goes nothing...\n");
-  char *hurp = malloc(200);
+  char *hurp = malloc(500);
   int i;
   /*
   printf("%x\n",(unsigned int)DATABLOCK(test,2));
@@ -841,13 +907,14 @@ int main(int argc, char** argv)
   /*  
 sprintf(hurp,"/test");
 rd_mkdir(hurp);*/
+  /*
   for(i=0;i<1023;i++)
     {
       sprintf(hurp,"/file%d",i);
-      if(rd_mkdir(hurp) == -1)
+      if(rd_creat(hurp) == -1)
 	printf("error\n");
     }
-  /*
+  
    for(i=0;i<1023;i++)
     {
       sprintf(hurp,"/file%d",i);
@@ -855,7 +922,13 @@ rd_mkdir(hurp);*/
 	printf("error\n");
     }
   */
+   sprintf(hurp,"/file1");
+  if(rd_creat(hurp) == -1)
+    printf("error\n");
+  
   sprintf(hurp,"/file2");
+  if(rd_creat(hurp) == -1)
+    printf("error\n");
   int test1 = rd_open(hurp);
   //rd_close(test1);
 
@@ -868,12 +941,26 @@ rd_mkdir(hurp);*/
    
   //printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
   char *testspace = malloc(20);
-  for(i=0;i<1000;i++)
+  /*  for(i=0;i<1000;i++)
     {
       if(rd_readdir(test2,testspace) == -1)
 	printf("error\n");
       printf("inode:\t%hu\nname:\t%s\n",*((unsigned short *) testspace), *((char **)(testspace + 2)));
     }
+  */
+  sprintf(hurp,"123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890");
+  int writenum;
+  for(i=0;i<6710;i++)
+    {
+      writenum = rd_write(test1,hurp,300);
+    }
+  writenum = rd_write(test1,hurp,184);
+  printf("writenum:\t%d\nfilesize:\t%d\n",writenum,GETINODESIZE(test,1));
+  rd_close(test1);
+  sprintf(hurp,"/file2");
+  rd_unlink(hurp);
+  sprintf(hurp,"/file1");
+  rd_unlink(hurp);
   /*
    sprintf(hurp,"/test");
    if(rd_unlink(hurp) == -1)
@@ -914,7 +1001,6 @@ rd_mkdir(hurp);*/
 
   */
   printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
-  tablearray[2].table[1].offset = 20;
-  printf("This offset should be 20: %d\n",tablearray[2].table[1].offset);
+
   return;
 }
