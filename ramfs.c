@@ -330,7 +330,7 @@ int rd_open(char * pathname)
 	  freeptr->table[0].inodenum = removeinode;
 	  return 0;
 	}
-		  
+
 
 }
 int rd_close(int fd)
