@@ -14,9 +14,10 @@ using namespace std;
 	int field1;
 	string field2;
 	int field3; //pid
-	string field4;
+	char *field4; //addresses
 	int field5;
 	int field6; //return
+	int field7; //return
 	} ioctl_test;
 
 int iosetup()
@@ -68,13 +69,49 @@ int rd_open(char *pathname)
 	io();
 	return ioctl_test.field6;
 }
+int rd_close(int fd)
+{
+	ioctl_test.field1=6;
+	ioctl_test.field5=fd;
+	io();
+	return ioctl_test.field6;
+}
 int rd_readdir(int fd, char *address)
 {
 	ioctl_test.field1=5;
 	ioctl_test.field5=fd;
 	ioctl_test.field4=address;
 	io();
-	printf("Name: %s\n",*((char **)(address + 2)));
+	printf("Name: %s\n",((char *)(address + 2)));
+	return ioctl_test.field6;
+}
+int rd_read(int fd, char *address, int num_bytes)
+{
+	ioctl_test.field1=7;
+	ioctl_test.field5=fd;
+	ioctl_test.field4=address;
+	ioctl_test.field7=num_bytes;
+	io();
+
+	return ioctl_test.field6;
+}
+int rd_lseek(int fd, int offset)
+{
+	ioctl_test.field1=9;
+	ioctl_test.field5=fd;
+	ioctl_test.field7=offset;
+	io();
+
+	return ioctl_test.field6;
+}
+int rd_write(int fd, char *address, int num_bytes)
+{
+	ioctl_test.field1=8;
+	ioctl_test.field5=fd;
+	ioctl_test.field4=address;
+	ioctl_test.field7=num_bytes;
+	io();
+
 	return ioctl_test.field6;
 }
 
@@ -85,17 +122,19 @@ int main ()
 	{
 		cout<<"Error Creating Directory test"<<endl;
 	}
-	result = rd_mkdir("/hi/test");
+	result = rd_creat("/hi/test");
 	if(result != 0)
 	{
-		cout<<"Error Creating Directory hi"<<endl;
+		cout<<"Error Creating file test"<<endl;
 	}
+
 	int fd = rd_open("/hi");
 	if(result != -1)
 	{
 		cout<<"file descriptor for /hi is: "<<fd<<endl;
 	}
 	int fd2 = rd_open("/hi/test");
+	
 	if(result != -1)
 	{
 		cout<<"file descriptor for /test is: "<<fd2<<endl;
@@ -109,6 +148,23 @@ int main ()
 	char *testspace = (char *)malloc(20);
 	rd_readdir(fd,testspace);
 	free(testspace);
+	
+	
+	char *data = (char *)malloc(10);
+	sprintf(data,"this test");
+	result = rd_write(fd2,data,10);
+	
+		
+		cout<<"write return "<<result<<endl;
+		
+	int seek = rd_lseek(fd2,0);
+		cout<<"seek return "<<seek<<endl;
+char *rresult = (char *)malloc(10);
+	//sprintf(data,"this test");
+	result = rd_read(fd2,rresult,10);
+		cout<<"bytes read: "<<result<<endl;
+		cout<<"read returned: "<<rresult<<endl;
+		
 	
 	return 0;
 }
