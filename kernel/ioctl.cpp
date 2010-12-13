@@ -24,7 +24,7 @@ int iosetup()
 {
 	int pid = (int) getpid();
 	ioctl_test.field3=pid;
-	int fd = open ("/proc/ioctl_test", O_RDONLY);
+	int fd = open ("/proc/ramdisk", O_RDONLY);
 	return fd;
 }
 void io()

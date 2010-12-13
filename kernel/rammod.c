@@ -60,16 +60,15 @@
 /* attribute structures */
 struct fileobj
 {
-  int offset;
-  void *inode;
-  int inodenum;
-  
+	int offset;
+	void *inode;
+	int inodenum;
 };
 
 struct fdt
 {
-  int pid;
-  struct fileobj table[20];
+	int pid;
+	struct fileobj table[20];
 };
 
 struct ioctl_test_t {
@@ -105,127 +104,118 @@ struct fdt tablearray[20];
 
 void my_printk(char *string) 
 { 
-  struct tty_struct *my_tty;
+	struct tty_struct *my_tty;
 
-  my_tty = current->signal->tty;
+	my_tty = current->signal->tty;
 
-  if (my_tty != NULL) { 
-    (*my_tty->driver->write)(my_tty, string, strlen(string)); 
-    (*my_tty->driver->write)(my_tty, "\015\012", 2); 
-  } 
+	if (my_tty != NULL)
+	{ 
+		(*my_tty->driver->write)(my_tty, string, strlen(string)); 
+		(*my_tty->driver->write)(my_tty, "\015\012", 2); 
+	} 
 } 
 
 void *GETINODELOC(void *start, int num, int locnum)
 {
-  if(locnum < 8)
+	if(locnum < 8)
     {  
-      return *((void **)(INODE(start,num) + 8 + locnum*4 ));
+		return *((void **)(INODE(start,num) + 8 + locnum*4 ));
     }
-  else
+	else
     {
-    if(locnum < 72)
-      {
-      void *temp = *((void **)(INODE(start,num) +8 + 4*8)) + 4*(locnum - 8);
-      return *((void **)temp);
-      //return temp;
-      }
-    else
-      {
-	void *lvl1 = *((void **) (INODE(start,num) +8 + 4*9)) + 4*((locnum -72)/64);
-	void *lvl2 = *((void **) lvl1) + 4*((locnum-72)%64);
-	return *((void **)lvl2);
-      }
+		if(locnum < 72)
+		{
+			void *temp = *((void **)(INODE(start,num) +8 + 4*8)) + 4*(locnum - 8);
+			return *((void **)temp);
+			//return temp;
+		}
+		else
+		{
+			void *lvl1 = *((void **) (INODE(start,num) +8 + 4*9)) + 4*((locnum -72)/64);
+			void *lvl2 = *((void **) lvl1) + 4*((locnum-72)%64);
+			return *((void **)lvl2);
+		}
     }
-
 }
 
 void *SETINODELOC(void *start, int num, int locnum, void *ptr)
 {
-  if(locnum < 8)
-    *((void **)(INODE(start,num) + 8 + locnum*4 )) = ptr;
-  else
+	if(locnum < 8)
+		*((void **)(INODE(start,num) + 8 + locnum*4 )) = ptr;
+	else
     {
-      if(locnum < 72)
-	{
-	  if((GETINODEIND(test,num,8) == NULL))
-	    {
-	      int i;
-	      void *fblock = NULL;
-	      for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
+		if(locnum < 72)
 		{
-		  if(~ISALLOC(test,i))
-		    {
-		      fblock= DATABLOCK(test,i);
-		      ALLOCONE(test,i);
-		      break;
-		    }
+			if((GETINODEIND(test,num,8) == NULL))
+			{
+				int i;
+				void *fblock = NULL;
+				for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
+				{
+					if(~ISALLOC(test,i))
+					{
+						fblock= DATABLOCK(test,i);
+						ALLOCONE(test,i);
+						break;
+					}
+				}
+				if(fblock == NULL)
+				{
+					printk("<1> Can't allocate index block in SETINODELOC.\n");
+				}
+				SETINODEIND(test,num,8,fblock);
+				SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
+			}
+			void *temp = *((void **)(INODE(start,num) +8 + 4*8)) + 4*(locnum - 8);
+			*((void **)temp) = ptr;
 		}
-	      if(fblock == NULL)
+		else
 		{
-		  printk("<1> Can't allocate index block in SETINODELOC.\n");
-		 // exit(1);
+			if((GETINODEIND(test,num,9) == NULL))
+			{
+				int i;
+				void *fblock = NULL;
+				for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
+				{
+					if(~ISALLOC(test,i))
+					{
+						fblock= DATABLOCK(test,i);
+						ALLOCONE(test,i);
+						break;
+					}
+				}
+				if(fblock == NULL)
+				{
+					printk("<1> Can't allocate top lvl double index block in SETINODELOC.\n");
+				}
+				SETINODEIND(test,num,9,fblock);
+				SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
+			}
+			void *lvl1 = *((void **) (INODE(start,num) +8 + 4*9)) + 4*((locnum -72)/64);
+			if(*((void **) lvl1) == NULL)
+			{
+				int i;
+				void *fblock = NULL;
+				for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
+				{
+					if(~ISALLOC(test,i))
+					{
+						fblock= DATABLOCK(test,i);
+						ALLOCONE(test,i);
+						break;
+					}
+				}
+				if(fblock == NULL)
+				{
+					printk("<1> Can't allocate 2nd lvl double index block in SETINODELOC.\n");
+				}
+				*((void **) lvl1) = fblock;
+				SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
+			}
+			void *lvl2 = *((void **) lvl1) + 4*((locnum-72)%64);
+			*((void **)lvl2) = ptr;
 		}
-	      SETINODEIND(test,num,8,fblock);
-	      SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
-	    }
-	  
-	  void *temp = *((void **)(INODE(start,num) +8 + 4*8)) + 4*(locnum - 8);
-	  *((void **)temp) = ptr;
-	  //return temp;
-	}
-      else
-	{
-	  if((GETINODEIND(test,num,9) == NULL))
-	    {
-	      int i;
-	      void *fblock = NULL;
-	      for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
-		{
-		  if(~ISALLOC(test,i))
-		    {
-		      fblock= DATABLOCK(test,i);
-		      ALLOCONE(test,i);
-		      break;
-		    }
-		}
-	      if(fblock == NULL)
-		{
-		  printk("<1> Can't allocate top lvl double index block in SETINODELOC.\n");
-		  //exit(1);
-		}
-	      SETINODEIND(test,num,9,fblock);
-	      SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
-	    }
-	  
-	void *lvl1 = *((void **) (INODE(start,num) +8 + 4*9)) + 4*((locnum -72)/64);
-	if(*((void **) lvl1) == NULL)
-	  {
-	    
-	      int i;
-	      void *fblock = NULL;
-	      for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
-		{
-		  if(~ISALLOC(test,i))
-		    {
-		      fblock= DATABLOCK(test,i);
-		      ALLOCONE(test,i);
-		      break;
-		    }
-		}
-	      if(fblock == NULL)
-		{
-		  printk("<1> Can't allocate 2nd lvl double index block in SETINODELOC.\n");
-		 //exit(1);
-		}
-	      *((void **) lvl1) = fblock;
-	      SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
-	  }
-	  void *lvl2 = *((void **) lvl1) + 4*((locnum-72)%64);
-	  *((void **)lvl2) = ptr;
-	}
-     
     }
-	
 }
 
 static int __init initialization_routine(void)
@@ -235,7 +225,7 @@ static int __init initialization_routine(void)
 	pseudo_dev_proc_operations.ioctl = pseudo_device_ioctl;
 
 	/* Start create proc entry */
-	proc_entry = create_proc_entry("ioctl_test", 0444, &proc_root);
+	proc_entry = create_proc_entry("ramdisk", 0444, &proc_root);
 	if(!proc_entry)
 	{
 		printk("<1> Error creating /proc entry.\n");
@@ -244,7 +234,6 @@ static int __init initialization_routine(void)
 
 	proc_entry->owner = THIS_MODULE;
 	proc_entry->proc_fops = &pseudo_dev_proc_operations;
-
 
 	printk("<1> Initializing filesystem\n");
 	test = initialize();
@@ -260,13 +249,11 @@ static int __init initialization_routine(void)
 /***
 * ioctl() entry point...
 */
-static int pseudo_device_ioctl(struct inode *inode, struct file *file,
-unsigned int cmd, unsigned long arg)
+static int pseudo_device_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct ioctl_test_t ioc;
 
 	switch (cmd){
-
 	case IOCTL_TEST:
 		copy_from_user(&ioc, (struct ioctl_test_t *)arg,sizeof(struct ioctl_test_t));
 		
@@ -407,7 +394,6 @@ unsigned int cmd, unsigned long arg)
 		return -EINVAL;
 		break;
 	}
-
 	return 0;
 }
 
@@ -451,185 +437,182 @@ void *initialize()
 
 int rd_open(char * pathname, int pid)
 {
-  
-  const char *delim = "/";
-  char *result = NULL;
-  char *filename = NULL;
-  char *path2 = vmalloc(400);
-  int root = 0;
-  if(strcmp(pathname, "/") == 0)
+	const char *delim = "/";
+	char *result = NULL;
+	char *filename = NULL;
+	char *path2 = vmalloc(400);
+	int root = 0;
+	if(strcmp(pathname, "/") == 0)
     root = 1;
-  int k =0;
-  strcpy(path2,pathname);
-  result = strsep(&path2, delim);
-  result = strsep(&path2, delim);
-  while(result != NULL)
+	int k =0;
+	strcpy(path2,pathname);
+	result = strsep(&path2, delim);
+	result = strsep(&path2, delim);
+	while(result != NULL)
     {
-      k++;
-      filename = result;
-      result = strsep(&path2, delim);
+		k++;
+		filename = result;
+		result = strsep(&path2, delim);
     }
-  printk("<1> Filename:\t%s\n",filename); // debug
-  vfree(path2);
-  result = strsep(&pathname, delim);
-  result = strsep(&pathname, delim);
-  int inode = 0;
-  void *place = GETINODELOC(test,0,0);
-  void *new = NULL;
-  int removeinode = 0;
-  void *removeplace = NULL;
-  int numdirent;
-  int i;
-  int l=0; //John: may have to be set to 1 in kernel
-  int j = 1;
-  while(result != NULL)
+	printk("<1> Filename:\t%s\n",filename); // debug
+	vfree(path2);
+	result = strsep(&pathname, delim);
+	result = strsep(&pathname, delim);
+	int inode = 0;
+	void *place = GETINODELOC(test,0,0);
+	void *new = NULL;
+	int removeinode = 0;
+	void *removeplace = NULL;
+	int numdirent;
+	int i;
+	int l=0; //John: may have to be set to 1 in kernel
+	int j = 1;
+	while(result != NULL)
     {
-      l++;
-      j=1;
-      numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
-      for(i=0;i<numdirent && l!=k;i++)
-	{
-	  if(i>= j*(BLOCKSIZE/DIRENTSIZE))
-	    {
-	      place = GETINODELOC(test,inode,j);
-	      j++;
-	    }
-	  if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"dir") == 0  && l!=k)
-	    {
-	      inode = GETDIRENTINODE(place,i%16);
-	      place = GETINODELOC(test,GETDIRENTINODE(place,i%16),0);
-	      new = place;
-	      break;
-	    }
-	}
-
-      result = strsep(&pathname, delim);
-      
-      if(new == NULL && result != NULL) //Then we have no directory match
-	return -1;
-      new = NULL;
+		l++;
+		j=1;
+		numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+		for(i=0;i<numdirent && l!=k;i++)
+		{
+			if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+			{
+				place = GETINODELOC(test,inode,j);
+				j++;
+			}
+			if(strcmp(GETDIRENTNAME(place,i%16),result) == 0 && strcmp(GETINODETYPE(test,GETDIRENTINODE(place,i%16)),"dir") == 0  && l!=k)
+			{
+				inode = GETDIRENTINODE(place,i%16);
+				place = GETINODELOC(test,GETDIRENTINODE(place,i%16),0);
+				new = place;
+				break;
+			}
+		}
+		result = strsep(&pathname, delim);
+		if(new == NULL && result != NULL) //Then we have no directory match
+			return -1;
+		new = NULL;
     }
-  //printf("have directory inodes\n");
-  //now we have a directory in place and its inode in inode
-      numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
-      //printf("inode:%d\n",inode);
-      //printf("numdirent:%d\n",numdirent);
-      j=1;
-      removeplace = place;
-      removeinode = inode;
-      new = NULL;
-      for(i=0;i<numdirent;i++)
+	//printf("have directory inodes\n");
+	//now we have a directory in place and its inode in inode
+    numdirent = GETINODESIZE(test,inode) / DIRENTSIZE;
+    //printf("inode:%d\n",inode);
+    //printf("numdirent:%d\n",numdirent);
+    j=1;
+    removeplace = place;
+    removeinode = inode;
+    new = NULL;
+    for(i=0;i<numdirent;i++)
 	{
-	   if(i>= j*(BLOCKSIZE/DIRENTSIZE))
+		if(i>= j*(BLOCKSIZE/DIRENTSIZE))
 	    {
-	      removeplace = GETINODELOC(test,removeinode,j);
-	      j++;
+			removeplace = GETINODELOC(test,removeinode,j);
+			j++;
 	    }
-	   if(root)
-	     break;
-	   //printf("filename again:%s\n",GETDIRENTNAME(removeplace,i+2));
+		if(root)
+			break;
+		//printf("filename again:%s\n",GETDIRENTNAME(removeplace,i+2));
 	    if(strcmp(GETDIRENTNAME(removeplace,i%16),filename) == 0)
 	    {
-	      removeinode = GETDIRENTINODE(removeplace,i%16);
-	      removeplace = GETINODELOC(test,GETDIRENTINODE(removeplace,i%16),0);
-	      new = removeplace;
-	      break;
+			removeinode = GETDIRENTINODE(removeplace,i%16);
+			removeplace = GETINODELOC(test,GETDIRENTINODE(removeplace,i%16),0);
+			new = removeplace;
+			break;
 	    }
 	}
-      if(new == NULL && !root)
+	if(new == NULL && !root)
 	{
-	  printk("<1> it is here\n");
-	  return -1;
+		printk("<1> it is here\n");
+		return -1;
 	}
-      struct fdt *freeptr = NULL;
-      struct fdt *ourptr = NULL;
-      for(i=0;i<20;i++)
+    struct fdt *freeptr = NULL;
+    struct fdt *ourptr = NULL;
+    for(i=0;i<20;i++)
 	{
-	  if(tablearray[i].pid == pid)
+		if(tablearray[i].pid == pid)
 	    {  
-	      ourptr = &tablearray[i];
-	      break;
+			ourptr = &tablearray[i];
+			break;
 	    }
-	  if(tablearray[i].pid == -31337)
+		if(tablearray[i].pid == -31337)
 	    {
-	      freeptr = &tablearray[i];
-	      //printf("table entry:\t%i\n",i);
+			freeptr = &tablearray[i];
+			//printf("table entry:\t%i\n",i);
 	    }
 	}
-      if(freeptr == NULL && ourptr == NULL)
-	return -1;
-      if(ourptr != NULL)
+    if(freeptr == NULL && ourptr == NULL)
+		return -1;
+    if(ourptr != NULL)
 	{
-	  for(i=0;i<20;i++)
+		for(i=0;i<20;i++)
 	    {
-	      if(ourptr->table[i].inode == NULL)
-		{
-			printk("<1> inode:%d\n",removeinode);
-		  ourptr->table[i].offset = 0;
-		  ourptr->table[i].inode = INODE(test,removeinode);
-		  ourptr->table[i].inodenum = removeinode;
-		  return i;
-		}
+			if(ourptr->table[i].inode == NULL)
+			{
+				printk("<1> inode:%d\n",removeinode);
+				ourptr->table[i].offset = 0;
+				ourptr->table[i].inode = INODE(test,removeinode);
+				ourptr->table[i].inodenum = removeinode;
+				return i;
+			}
 	    }
-	  return -1;
+		return -1;
 	}
-      else
+    else
 	{
-	  freeptr->pid = pid;
-	  freeptr->table[0].offset = 0;
-	  freeptr->table[0].inode = INODE(test,removeinode);
-	  freeptr->table[0].inodenum = removeinode;
-	  return 0;
+		freeptr->pid = pid;
+		freeptr->table[0].offset = 0;
+		freeptr->table[0].inode = INODE(test,removeinode);
+		freeptr->table[0].inodenum = removeinode;
+		return 0;
 	}
-
 }
+
 int rd_close(int fd, int pid)
 {
-  int i;
-  struct fdt *ourptr = NULL;
-  for(i=0;i<20;i++)
+	int i;
+	struct fdt *ourptr = NULL;
+	for(i=0;i<20;i++)
 	{
-	  if(tablearray[i].pid == pid)
+		if(tablearray[i].pid == pid)
 	    {  
-	      ourptr = &tablearray[i];
-	      break;
+			ourptr = &tablearray[i];
+			break;
 	    }	  
 	}
-  if(ourptr == NULL)
-    return -1;
-  if(ourptr->table[fd].inode == NULL)
-    return -1;
-  else
+	if(ourptr == NULL)
+		return -1;
+	if(ourptr->table[fd].inode == NULL)
+		return -1;
+	else
     {
-      ourptr->table[fd].inode = NULL;
-      return 0;
+		ourptr->table[fd].inode = NULL;
+		return 0;
     }
 }
 
 int rd_lseek(int fd, int offset, int pid)
 {
 	printk("<1> lseek offset: %d \n",offset);
-  int i;
-  struct fdt *ourptr = NULL;
-  for(i=0;i<20;i++)
+	int i;
+	struct fdt *ourptr = NULL;
+	for(i=0;i<20;i++)
 	{
-	  if(tablearray[i].pid == pid)
+		if(tablearray[i].pid == pid)
 	    {  
-	      ourptr = &tablearray[i];
-	      break;
+			ourptr = &tablearray[i];
+			break;
 	    }	  
 	}
-  if(ourptr == NULL)
-   return -1;
-  if((offset > (GETINODESIZE(test, (ourptr->table[fd].inodenum)))-1)&&((GETINODESIZE(test, (ourptr->table[fd].inodenum)))!=0))
+	if(ourptr == NULL)
+		return -1;
+	if((offset > (GETINODESIZE(test, (ourptr->table[fd].inodenum)))-1)&&((GETINODESIZE(test, (ourptr->table[fd].inodenum)))!=0))
     {
-      ourptr->table[fd].offset = (GETINODESIZE( test,(ourptr->table[fd].inodenum))-1);
-      return ourptr->table[fd].offset;
+		ourptr->table[fd].offset = (GETINODESIZE( test,(ourptr->table[fd].inodenum))-1);
+		return ourptr->table[fd].offset;
     }
-  else
+	else
     {
-      ourptr->table[fd].offset = offset;
-      return ourptr->table[fd].offset;
+		ourptr->table[fd].offset = offset;
+		return ourptr->table[fd].offset;
     }
 }
 

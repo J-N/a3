@@ -32,16 +32,17 @@ int main ()
 	rd_lseek(fd,0);
 	
 	sprintf(big,"123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890");
-  int writenum;
-  for(i=0;i<61;i++)
+	int writenum;
+	for(i=0;i<6710;i++)
     {
-      writenum = rd_write(fd,big,300);
+		writenum = rd_write(fd,big,300);
     }
-  writenum = rd_write(fd,big,100);
+	writenum = rd_write(fd,big,184);
 	
-	char* bigr = (char*) malloc(2013184);
-	rd_lseek(fd,0);
-	int read = rd_read(fd,bigr,2013184);
+	char* bigr = (char*) malloc(2);
+	int seek = rd_lseek(fd,0);
+	cout<<"seeked "<<seek<<endl;
+	int read = rd_read(fd,bigr,2);
 	cout<<"read "<<read<<" bytes"<<endl;
 	int t;
 	cout<<"Enter 1 to see the results of read or 0 to skip"<<endl;
