@@ -15,34 +15,10 @@ int rd_read(int fd, char *address, int num_bytes);
 
 int main () 
 {
-//1023
-	int i=0;
-	int br=0;
-	char* name= (char*)malloc(20);
-	for(i=0;i<1023;i++)
-	{
-		sprintf(name,"/dir%d",i);
-		int result = rd_mkdir(name);
-		if(result != 0)
-		{
-			cout<<"Error creating dir"<<i<<endl;
-			br=1;
-		}
-	}
-	for(i=0;i<1023;i++)
-	{
-		sprintf(name,"/dir%d",i);
-		int result = rd_unlink(name);
-		if(result != 0)
-		{
-			cout<<"Error deleting dir"<<i<<endl;
-			br=1;
-		}
-	}
-	if(br==0)
-	{
-		cout<<"Successfully created and removed 1023 directories"<<endl;
-	}
-	
+	rd_mkdir("/test");
+	rd_mkdir("/test2");
+	int fd = rd_open("/");
+	char* dname = (char*) malloc(30);
+	int result = rd_readdir(fd,dname);
 	return 0;
 }

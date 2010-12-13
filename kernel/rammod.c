@@ -1001,6 +1001,7 @@ int rd_unlink(char *pathname)
 	char *filename = NULL;
 	char *path2 = vmalloc(400);
 	int k =0;
+	int g;
 	strcpy(path2,pathname);
 	result = strsep(&path2, delim);
 	result = strsep(&path2, delim);
@@ -1105,8 +1106,11 @@ int rd_unlink(char *pathname)
     //remove single indirect index blocks
     if(removeblocks > 8)
 	{
-		ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODEIND(test,removeinode,8)));
-		SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+		for(i=0;i<256;i++)
+	    ((char *)GETINODEIND(test,removeinode,8))[i] = '\0';
+	  ALLOCZERO(test,GETBLOCKFROMPTR(test,GETINODEIND(test,removeinode,8)));
+	  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+	  printk("<1> removing indirect block\n");
 	}
     //remove double indirect index blocks
     if(removeblocks > 72)
@@ -1116,11 +1120,17 @@ int rd_unlink(char *pathname)
 		{
 			if(i <= (((GETINODESIZE(test,removeinode) - 1)/256) - 72)/64)
 			{
-				ALLOCZERO(test,GETBLOCKFROMPTR(test,(void *)(*((unsigned int *) doubleind + i))));
-				SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
+				
+				  for(g=0;g<256;g++)
+					((char *)(void *)(*((unsigned int *) doubleind + i)))[g] = '\0';
+				  ALLOCZERO(test,GETBLOCKFROMPTR(test,(void *)(*((unsigned int *) doubleind + i))));
+				  SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
  				printk("<1> remove blk ptr %d\n",i);
  		    }
 		}
+		void * fff = doubleind;
+	  for(g=0;g<256;g++)
+	    ((char *)fff)[g] = '\0';
 		ALLOCZERO(test,GETBLOCKFROMPTR(test,doubleind));
 		SETSUPERBLOCK(test,GETSUPERBLOCK(test) + 1);
   

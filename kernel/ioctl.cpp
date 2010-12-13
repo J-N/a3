@@ -83,7 +83,7 @@ int rd_readdir(int fd, char *address)
 	ioctl_test.field5=fd;
 	ioctl_test.field4=address;
 	io();
-	printf("Name: %s\n",((char *)(address + 2)));
+	printf("%s\n",((char *)(address + 2)));
 	return ioctl_test.field6;
 }
 int rd_read(int fd, char *address, int num_bytes)
