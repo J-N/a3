@@ -403,7 +403,8 @@ int rd_readdir(int fd, char *address)
   int blockpos = ourptr->table[fd].offset % 256;
   int dirpos = blockpos / 16;
   *((unsigned short *)address) = GETDIRENTINODE(blk,dirpos);
-  *((char **)(address + 2)) = GETDIRENTNAME(blk,dirpos);
+  //*((char **)(address + 2)) = GETDIRENTNAME(blk,dirpos);
+  strcpy((char *) address + 2,GETDIRENTNAME(blk,dirpos));
   ourptr->table[fd].offset += 16;
   return 1;
 }
@@ -1058,13 +1059,10 @@ rd_mkdir(hurp);*/
    
   //printf("Free Blocks:\t%d\nFree Inodes:\t%d\n",GETSUPERBLOCK(test),GETSUPERINODE(test));
   char *testspace = malloc(20);
-  /*  for(i=0;i<1000;i++)
-    {
+ 
       if(rd_readdir(test2,testspace) == -1)
 	printf("error\n");
-      printf("inode:\t%hu\nname:\t%s\n",*((unsigned short *) testspace), *((char **)(testspace + 2)));
-    }
-  */
+      printf("inode:\t%hu\nname:\t%s\n",*((unsigned short *) testspace), (char *) testspace + 2);
   /*  sprintf(hurp,"123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890");
   int writenum;
   for(i=0;i<6710;i++)
