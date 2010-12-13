@@ -680,7 +680,7 @@ int rd_readdir(int fd, char *address, int pid)
 		return -1;
 	if(strcmp(GETINODETYPE(test,ourptr->table[fd].inodenum),"dir") != 0)
 		return -1;
-	if(ourptr->table[fd].offset > GETINODESIZE(test,ourptr->table[fd].inodenum))
+	if(ourptr->table[fd].offset >= GETINODESIZE(test,ourptr->table[fd].inodenum))
 		return 0;
 	blk = GETINODELOC(test,ourptr->table[fd].inodenum,ourptr->table[fd].offset / 256);
 	int blockpos = ourptr->table[fd].offset % 256;
