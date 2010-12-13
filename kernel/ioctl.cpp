@@ -149,7 +149,8 @@ int main ()
 	rd_readdir(fd,testspace);
 	free(testspace);
 	
-	
+	int seek = rd_lseek(fd2,0);
+	cout<<"seek1 return "<<seek<<endl;
 	char *data = (char *)malloc(10);
 	sprintf(data,"this test");
 	result = rd_write(fd2,data,10);
@@ -157,7 +158,7 @@ int main ()
 		
 		cout<<"write return "<<result<<endl;
 		
-	int seek = rd_lseek(fd2,0);
+	seek = rd_lseek(fd2,0);
 		cout<<"seek return "<<seek<<endl;
 char *rresult = (char *)malloc(10);
 	//sprintf(data,"this test");

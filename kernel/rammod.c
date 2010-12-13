@@ -395,7 +395,7 @@ unsigned int cmd, unsigned long arg)
 			//printk("<1> inode: %hu\n name: %s\n",*((unsigned short *) temp), ((char *)(temp + 2)));
 			vfree(temp);
 		}
-		if(f1==8) //lseek
+		if(f1==9) //lseek
 		{
 			int fd = f5;
 			int offset = f7;
@@ -606,6 +606,7 @@ int rd_close(int fd, int pid)
 
 int rd_lseek(int fd, int offset, int pid)
 {
+	printk("<1> lseek offset: %d \n",offset);
   int i;
   struct fdt *ourptr = NULL;
   for(i=0;i<20;i++)
@@ -618,9 +619,9 @@ int rd_lseek(int fd, int offset, int pid)
 	}
   if(ourptr == NULL)
    return -1;
-  if(offset > *((int *) (ourptr->table[fd].inode)))
+  if((offset > (GETINODESIZE(test, (ourptr->table[fd].inodenum)))-1)&&((GETINODESIZE(test, (ourptr->table[fd].inodenum)))!=0))
     {
-      ourptr->table[fd].offset = *((int *) (ourptr->table[fd].inode));
+      ourptr->table[fd].offset = (GETINODESIZE( test,(ourptr->table[fd].inodenum))-1);
       return ourptr->table[fd].offset;
     }
   else
@@ -1178,59 +1179,59 @@ int rd_unlink(char *pathname)
 
 int rd_write(int fd, char *address, int num_bytes, int pid)
 {
-  int i;
-  int bytes_left = num_bytes;
-  int size;
-  void *blk;
-  struct fdt *ourptr = NULL;
-  for(i=0;i<20;i++)
+	int i;
+	int bytes_left = num_bytes;
+	int size;
+	void *blk;
+	struct fdt *ourptr = NULL;
+	for(i=0;i<20;i++)
 	{
-	  if(tablearray[i].pid == pid)
+		if(tablearray[i].pid == pid)
 	    {  
-	      ourptr = &tablearray[i];
-	      break;
+			ourptr = &tablearray[i];
+			break;
 	    }	  
 	}
-  if(ourptr == NULL)
-   return 0;
-  if(strcmp(GETINODETYPE(test,ourptr->table[fd].inodenum),"reg") != 0)
-    return 0;
-  while(bytes_left > 0)
+	if(ourptr == NULL)
+		return 0;
+	if(strcmp(GETINODETYPE(test,ourptr->table[fd].inodenum),"reg") != 0)
+		return 0;
+	while(bytes_left > 0)
     {
-      size = GETINODESIZE(test,ourptr->table[fd].inodenum);
-      //do we need to allocate a new block?
-      if((ourptr->table[fd].offset / 256) > (size - 1) / 256)
-	{
+		size = GETINODESIZE(test,ourptr->table[fd].inodenum);
+		//do we need to allocate a new block?
+		if(((ourptr->table[fd].offset / 256) > (size - 1) / 256) && (size!=0))
+		{
 	        void *newdirblock = NULL;
-      for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
-	{
-	  if(~ISALLOC(test,i))
-	    {
-	      newdirblock= DATABLOCK(test,i);
-	      ALLOCONE(test,i);
-	      SETINODELOC(test,ourptr->table[fd].inodenum,(GETINODESIZE(test,ourptr->table[fd].inodenum) / 256),newdirblock);
-	      break;
-	    }
+		for(i=0;i<BITMAPBLOCKS * BLOCKSIZE * 8;i++)
+		{
+			if(~ISALLOC(test,i))
+			{
+				newdirblock= DATABLOCK(test,i);
+				ALLOCONE(test,i);
+				SETINODELOC(test,ourptr->table[fd].inodenum,(GETINODESIZE(test,ourptr->table[fd].inodenum) / 256),newdirblock);
+				break;
+			}
+		}
+		if(newdirblock == NULL)
+			return num_bytes - bytes_left;
+		SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
 	}
-      if(newdirblock == NULL)
-	return num_bytes - bytes_left;
-      SETSUPERBLOCK(test,GETSUPERBLOCK(test) - 1);
-	}
-      //ok, we're set up with a new block
+    //ok, we're set up with a new block
 	  
-      blk = GETINODELOC(test,ourptr->table[fd].inodenum,(ourptr->table[fd].offset / 256));
-      int blockpos = ourptr->table[fd].offset % 256;
-      for(i=blockpos;i<256;i++)
+    blk = GETINODELOC(test,ourptr->table[fd].inodenum,(ourptr->table[fd].offset / 256));
+    int blockpos = ourptr->table[fd].offset % 256;
+    for(i=blockpos;i<256;i++)
 	{
-	  *((unsigned char *) blk + i) = *((unsigned char *) address++);
-	  bytes_left --;
-	  ourptr->table[fd].offset ++;
-	  if(ourptr->table[fd].offset > GETINODESIZE(test,ourptr->table[fd].inodenum) - 1)
+		*((unsigned char *) blk + i) = *((unsigned char *) address++);
+		bytes_left --;
+		ourptr->table[fd].offset ++;
+		if(ourptr->table[fd].offset > GETINODESIZE(test,ourptr->table[fd].inodenum) - 1)
 	    {
-	      SETINODESIZE(test,ourptr->table[fd].inodenum,GETINODESIZE(test,ourptr->table[fd].inodenum) + 1);
+			SETINODESIZE(test,ourptr->table[fd].inodenum,GETINODESIZE(test,ourptr->table[fd].inodenum) + 1);
 	    }
-	  if(bytes_left == 0)
-	    return num_bytes;
+		if(bytes_left == 0)
+			return num_bytes;
 	}
     }
   return num_bytes;
