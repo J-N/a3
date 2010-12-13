@@ -36,6 +36,7 @@ void io()
 		cout<<"ioctl failed: "<<errno<<endl;
 		perror(NULL);
 	}
+	close(fd);
 }
 
 int rd_mkdir(char *pathname)

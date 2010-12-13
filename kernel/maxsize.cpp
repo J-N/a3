@@ -23,15 +23,21 @@ int main ()
 		cout<<"Error creating file"<<endl;
 	}
 	int fd = rd_open("/bigfile");
-	char* big = (char*)malloc(1);
+	char* big = (char*)malloc(350);
 
+	//2013184
 	int write;
-	for(i=0;i<2013184;i++)
-	{
-		big[0]='j';
-		write = rd_write(fd,big,1);
-	}
-	//cout<<"wrote "<<write<<" bytes"<<endl;
+	big[0]='j';
+
+	rd_lseek(fd,0);
+	
+	sprintf(big,"123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890");
+  int writenum;
+  for(i=0;i<61;i++)
+    {
+      writenum = rd_write(fd,big,300);
+    }
+  writenum = rd_write(fd,big,100);
 	
 	char* bigr = (char*) malloc(2013184);
 	rd_lseek(fd,0);
@@ -42,9 +48,10 @@ int main ()
 	cin>>t;
 	if(t==1)
 	{
-		cout<<*bigr<<endl;
+		for(i=0;i<2000;i++)
+			printf("%c",*bigr++);
 	}
-	
+	cout<<endl;
 	
 	result = rd_unlink("/bigfile");
 	if(result != 0)

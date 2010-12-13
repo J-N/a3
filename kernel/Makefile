@@ -24,3 +24,5 @@ usertest: userlib
 	g++ -g test1.cpp -L. -lramfs -o test1
 	g++ -g maxfiles.cpp -L. -lramfs -o maxfiles
 	g++ -g maxsize.cpp -L. -lramfs -o maxsize
+	g++ -g maxdirs.cpp -L. -lramfs -o maxdirs
+	g++ -g toomanydirs.cpp -L. -lramfs -o toomanydirs

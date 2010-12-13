@@ -17,24 +17,31 @@ int main ()
 {
 //1023
 	int i=0;
+	int br=0;
 	char* name= (char*)malloc(20);
 	for(i=0;i<1023;i++)
 	{
-		sprintf(name,"/file%d",i);
-		int result = rd_creat(name);
+		sprintf(name,"/dir%d",i);
+		int result = rd_mkdir(name);
 		if(result != 0)
 		{
-			cout<<"Error creating file"<<i<<endl;
+			cout<<"Error creating dir"<<i<<endl;
+			br=1;
 		}
 	}
 	for(i=0;i<1023;i++)
 	{
-		sprintf(name,"/file%d",i);
+		sprintf(name,"/dir%d",i);
 		int result = rd_unlink(name);
 		if(result != 0)
 		{
-			cout<<"Error deleting file"<<i<<endl;
+			cout<<"Error deleting dir"<<i<<endl;
+			br=1;
 		}
+	}
+	if(br==0)
+	{
+		cout<<"Successfully created and removed 1023 directories"<<endl;
 	}
 	
 	return 0;
